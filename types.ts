@@ -15,13 +15,17 @@ export interface Wallpaper {
   author: string;
   authorAvatar: string;
   url: string;
-  views: string;
-  downloads: string;
-  likes: string;
+  views: string | number;
+  downloads: string | number;
+  likes: string | number;
   type: 'live' | 'parallax' | 'interactive' | 'static';
   tags: string[];
   aspectRatio?: AspectRatio;
   deviceTarget?: 'phone' | 'pc' | 'tab' | 'all';
+  authorId?: string;
+  createdAt?: any;
+  visibility?: 'public' | 'private';
+  videoUrl?: string;
 }
 
 export interface Collection {
@@ -53,4 +57,14 @@ export interface Notification {
   read: boolean;
   content?: string;
   previewUrl?: string;
+}
+
+export interface AppComment {
+  id: string;
+  wallpaperId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  content: string;
+  createdAt: any;
 }

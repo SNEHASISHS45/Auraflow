@@ -3,11 +3,13 @@ import React, { useState } from 'react';
 import { motion, useMotionValue, useTransform, useMotionTemplate, AnimatePresence } from 'framer-motion';
 import { geminiService } from '../services/geminiService';
 import { soundService } from '../services/soundService';
+import { AnimateIcon } from '../components/ui/AnimateIcon';
+import { BrainIcon, SparklesIcon, GridIcon } from '../components/ui/Icons';
 
 export const MoodDiscovery: React.FC = () => {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  
+
   const [mood, setMood] = useState('Neutral Aura');
   const [resultDescription, setResultDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,7 @@ export const MoodDiscovery: React.FC = () => {
       const parts = prompt.split('.');
       setMood(parts[0] || 'Custom Energy');
       setResultDescription(parts.slice(1).join('.') || 'Synchronized visual harmonics generated from your spatial input.');
-      
+
       setTimeout(() => {
         setLoading(false);
         setShowResult(true);
@@ -45,7 +47,7 @@ export const MoodDiscovery: React.FC = () => {
 
       <AnimatePresence mode="wait">
         {!showResult ? (
-          <motion.div 
+          <motion.div
             key="input"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -54,7 +56,9 @@ export const MoodDiscovery: React.FC = () => {
           >
             <div className="z-10 text-center mb-12">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest mb-6">
-                <span className="material-symbols-outlined text-[14px]">psychology</span>
+                <AnimateIcon animation="path">
+                  <BrainIcon size={14} />
+                </AnimateIcon>
                 AI Mood Synthesis
               </div>
               <h2 className="text-4xl font-black mb-3 tracking-tight">Sync Your Aura</h2>
@@ -85,13 +89,21 @@ export const MoodDiscovery: React.FC = () => {
                 disabled={loading}
                 className="w-full bg-white text-black py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 hover:bg-primary hover:text-white"
               >
-                {loading ? <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="material-symbols-outlined">sync</motion.span> : <span className="material-symbols-outlined">magic_button</span>}
+                {loading ? (
+                  <AnimateIcon animation="path">
+                    <GridIcon size={20} className="animate-spin" />
+                  </AnimateIcon>
+                ) : (
+                  <AnimateIcon animation="default">
+                    <SparklesIcon size={20} />
+                  </AnimateIcon>
+                )}
                 {loading ? 'Synthesizing...' : 'Generate Vision'}
               </button>
             </div>
           </motion.div>
         ) : (
-          <motion.div 
+          <motion.div
             key="result"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
@@ -99,23 +111,25 @@ export const MoodDiscovery: React.FC = () => {
           >
             {/* AI Generated Visualization Placeholder */}
             <div className="relative size-64 mb-10">
-               <motion.div 
-                 animate={{ 
-                    scale: [1, 1.2, 1],
-                    rotate: [0, 90, 180, 270, 360],
-                    borderRadius: ["40%", "50%", "40%"]
-                 }}
-                 transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
-                 className="absolute inset-0 bg-gradient-to-br from-primary via-accent to-pink-500 blur-3xl opacity-50"
-               />
-               <div className="relative z-10 size-full rounded-[3rem] overflow-hidden border border-white/20 backdrop-blur-md flex items-center justify-center bg-black/20">
-                  <span className="material-symbols-outlined text-7xl text-white/20 animate-pulse">auto_awesome</span>
-               </div>
+              <motion.div
+                animate={{
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 90, 180, 270, 360],
+                  borderRadius: ["40%", "50%", "40%"]
+                }}
+                transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+                className="absolute inset-0 bg-gradient-to-br from-primary via-accent to-pink-500 blur-3xl opacity-50"
+              />
+              <div className="relative z-10 size-full rounded-[3rem] overflow-hidden border border-white/20 backdrop-blur-md flex items-center justify-center bg-black/20">
+                <AnimateIcon animation="path-loop">
+                  <SparklesIcon size={72} className="text-white/20" />
+                </AnimateIcon>
+              </div>
             </div>
 
             <h2 className="text-3xl font-black mb-4 tracking-tighter">{mood}</h2>
             <p className="text-white/60 text-sm leading-relaxed mb-10 px-4 italic">"{resultDescription}"</p>
-            
+
             <div className="flex gap-4 w-full">
               <button onClick={() => setShowResult(false)} className="flex-1 py-4 rounded-2xl border border-white/10 font-bold text-xs uppercase tracking-widest">Retry</button>
               <button onClick={() => soundService.playTap()} className="flex-1 py-4 rounded-2xl bg-primary font-bold text-xs uppercase tracking-widest shadow-xl shadow-primary/20">Save Aura</button>

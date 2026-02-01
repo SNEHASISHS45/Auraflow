@@ -1,9 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
 import { authService } from '../services/authService';
 import { soundService } from '../services/soundService';
 import { User } from '../types';
+import { AnimateIcon } from '../components/ui/AnimateIcon';
+import { XIcon, SparklesIcon, GridIcon } from '../components/ui/Icons';
 
 interface AuthProps {
   onAuthSuccess: (user: User) => void;
@@ -55,6 +57,20 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    soundService.playTap();
+    try {
+      const user = await authService.signInWithGoogle();
+      soundService.playSuccess();
+      onAuthSuccess(user);
+    } catch (err: any) {
+      setError(err.message || 'Google Sign-In failed');
+      setLoading(false);
+    }
+  };
+
   const containerVariants = {
     hidden: { opacity: 0, y: 30 },
     visible: {
@@ -94,32 +110,36 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
 
       {/* Close Button for Guest Browsing */}
       {onClose && (
-        <motion.button 
+        <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           onClick={onClose}
           className="absolute top-12 right-8 z-[510] size-12 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white"
         >
-          <span className="material-symbols-outlined">close</span>
+          <AnimateIcon animation="default">
+            <XIcon size={24} />
+          </AnimateIcon>
         </motion.button>
       )}
 
-      <motion.div 
+      <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
         className="w-full max-w-md px-8 relative z-10"
       >
         <motion.div variants={itemVariants} className="text-center mb-10">
-          <motion.div 
-            animate={{ 
+          <motion.div
+            animate={{
               rotate: [0, 10, -10, 0],
-              scale: [1, 1.05, 1] 
+              scale: [1, 1.05, 1]
             }}
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
             className="size-20 bg-gradient-to-br from-primary to-accent rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-[0_0_50px_rgba(43,108,238,0.4)]"
           >
-            <span className="material-symbols-outlined text-4xl text-white fill-icon">blur_on</span>
+            <AnimateIcon animation="default">
+              <SparklesIcon size={40} className="text-white fill-current" />
+            </AnimateIcon>
           </motion.div>
           <h1 className="text-5xl font-black tracking-tighter mb-2 text-white">AuraFlow</h1>
           <p className="text-white/60 text-xs font-bold uppercase tracking-[0.4em]">
@@ -128,26 +148,26 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
         </motion.div>
 
         <motion.div variants={itemVariants} layout className="space-y-4">
-          <form 
+          <form
             onSubmit={handleSubmit}
             className="bg-white/10 border border-white/20 p-8 rounded-[3rem] backdrop-blur-3xl shadow-2xl space-y-6"
           >
             <AnimatePresence mode="wait">
               {!isLogin && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }} 
-                  animate={{ opacity: 1, height: 'auto' }} 
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   className="space-y-1.5 overflow-hidden"
                 >
                   <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-2">Full Name</label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={name} 
-                    onChange={(e) => setName(e.target.value)} 
-                    placeholder="Alex Rivera" 
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-white/20" 
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Alex Rivera"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-white/20"
                   />
                 </motion.div>
               )}
@@ -155,45 +175,47 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-2">Email Address</label>
-              <input 
-                type="email" 
-                required 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                placeholder="aura@flow.com" 
-                className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-white/20" 
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="aura@flow.com"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-white/20"
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-2">Password</label>
-              <input 
-                type="password" 
-                required 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder="••••••••" 
-                className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-white/20" 
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 px-6 font-bold text-sm outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-white/20"
               />
             </div>
 
             {error && (
-              <motion.p 
-                initial={{ opacity: 0, scale: 0.9 }} 
-                animate={{ opacity: 1, scale: 1 }} 
+              <motion.p
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
                 className="text-red-400 text-[10px] font-bold text-center uppercase tracking-wider"
               >
                 {error}
               </motion.p>
             )}
 
-            <button 
-              type="submit" 
-              disabled={loading} 
+            <button
+              type="submit"
+              disabled={loading}
               className="w-full bg-primary hover:bg-primary/90 text-white h-16 rounded-2xl font-black text-xs uppercase tracking-[0.25em] shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center justify-center"
             >
               {loading ? (
-                <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="material-symbols-outlined">sync</motion.span>
+                <AnimateIcon animation="path">
+                  <GridIcon size={24} className="animate-spin" />
+                </AnimateIcon>
               ) : (
                 isLogin ? 'Initialize Aura' : 'Begin Journey'
               )}
@@ -206,18 +228,39 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
             <div className="h-px flex-1 bg-white/10" />
           </motion.div>
 
-          <motion.button 
+          <motion.div
             variants={itemVariants}
-            onClick={() => { soundService.playTap(); authService.signInWithGoogle().then(onAuthSuccess); }}
-            disabled={loading}
-            className="w-full bg-white text-black h-16 rounded-2xl font-black text-[10px] uppercase tracking-[0.15em] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-4"
+            className="flex justify-center"
           >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="size-5" alt="G" />
-            Connect via Google
-          </motion.button>
+            {!loading && (
+              <button
+                onClick={async () => {
+                  setError('');
+                  setLoading(true);
+                  soundService.playTap();
+                  try {
+                    const user = await authService.signInWithGoogle();
+                    onAuthSuccess(user);
+                  } catch (err: any) {
+                    setError(err.message || 'Google Sign-In failed');
+                    setLoading(false);
+                  }
+                }}
+                className="h-10 px-6 bg-white text-black hover:bg-slate-200 transition-colors rounded-full flex items-center gap-3 font-medium text-sm shadow-lg"
+              >
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+                <span>Continue with Google</span>
+              </button>
+            )}
+            {loading && (
+              <div className="w-full bg-white text-black h-12 rounded-full flex items-center justify-center font-bold text-xs uppercase tracking-widest opacity-50">
+                Connecting...
+              </div>
+            )}
+          </motion.div>
         </motion.div>
 
-        <motion.button 
+        <motion.button
           variants={itemVariants}
           onClick={() => { setIsLogin(!isLogin); setError(''); soundService.playTick(); }}
           className="w-full mt-8 text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors"

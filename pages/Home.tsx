@@ -1,9 +1,13 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MOCK_WALLPAPERS } from '../constants';
 import { Wallpaper } from '../types';
 import { soundService } from '../services/soundService';
+import { pexelsService, WallpaperItem } from '../services/pexelsService';
+import { wallhavenService, WallhavenItem } from '../services/wallhavenService';
+import { Skeleton } from '../components/Skeleton';
+import { AnimateIcon } from '../components/ui/AnimateIcon';
+import { HeartIcon } from '../components/ui/Icons';
+import { Play, RefreshCw } from 'lucide-react';
 
 interface HomeProps {
   onSelect: (w: Wallpaper) => void;
@@ -13,22 +17,53 @@ interface HomeProps {
   onSearchClick?: () => void;
 }
 
-const ITEMS_PER_PAGE = 15;
+// Convert Pexels item to Wallpaper type
+const toWallpaper = (item: WallpaperItem): Wallpaper => ({
+  id: item.id,
+  title: item.title,
+  url: item.url,
+  author: item.author,
+  authorAvatar: item.authorAvatar,
+  type: item.type === 'video' ? 'live' : 'static',
+  tags: item.tags,
+  views: item.views,
+  downloads: item.downloads,
+  likes: item.likes,
+  videoUrl: item.videoUrl
+});
 
-const WallpaperCard = React.memo(({ 
-  wp, 
-  onSelect, 
-  onLike, 
+const WallpaperCard = React.memo(({
+  wp,
+  item,
+  onSelect,
+  onLike,
   isLiked,
   index
-}: { 
-  wp: Wallpaper; 
-  onSelect: (w: Wallpaper) => void; 
+}: {
+  wp: Wallpaper;
+  item: WallpaperItem;
+  onSelect: (w: Wallpaper) => void;
   onLike: (e: React.MouseEvent, id: string) => void;
   isLiked: boolean;
   index: number;
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const isVideo = item.type === 'video' && item.videoUrl;
+
+  // Play/pause video on hover
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      if (isHovered) {
+        videoRef.current.play().catch(() => { });
+      } else {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+    }
+  }, [isHovered, isVideo]);
 
   return (
     <motion.div
@@ -37,79 +72,148 @@ const WallpaperCard = React.memo(({
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: (index % 5) * 0.05 }}
       onClick={() => onSelect(wp)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className="group cursor-pointer"
     >
-      <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 transition-colors group-hover:border-black/20 dark:group-hover:border-white/20">
-        <img 
-          src={wp.url} 
-          onLoad={() => setImageLoaded(true)}
-          className={`w-full h-full object-cover transition-transform duration-700 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-105`} 
-          alt={wp.title} 
-          loading="lazy" 
-        />
-        
-        {wp.type !== 'static' && (
-          <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 backdrop-blur-md rounded-md text-[8px] font-bold text-white uppercase tracking-widest border border-white/10">
-            {wp.type}
+      <div
+        className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 transition-all group-hover:border-black/20 dark:group-hover:border-white/20 group-hover:shadow-xl"
+        style={{ backgroundColor: item.avgColor || undefined }}
+      >
+        {!imageLoaded && (
+          <Skeleton className="absolute inset-0 rounded-none w-full h-full" />
+        )}
+
+        {/* Video preview on hover */}
+        {isVideo && isHovered ? (
+          <video
+            ref={videoRef}
+            src={item.videoUrl}
+            className="w-full h-full object-cover"
+            muted
+            loop
+            playsInline
+          />
+        ) : (
+          <img
+            src={item.thumbnailUrl || item.url}
+            onLoad={() => setImageLoaded(true)}
+            className={`w-full h-full object-cover transition-transform duration-700 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-105`}
+            alt={wp.title}
+            loading="lazy"
+          />
+        )}
+
+        {/* Video indicator - only show if there's an actual video */}
+        {isVideo && (
+          <div className={`absolute top-3 right-3 size-8 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 transition-opacity ${isHovered ? 'opacity-0' : 'opacity-100'}`}>
+            <Play size={14} className="text-white fill-white ml-0.5" />
           </div>
         )}
-      </div>
-      
-      <div className="mt-3 px-1 flex items-start justify-between">
-        <div>
-          <h3 className="text-[11px] font-extrabold uppercase tracking-tight text-primary dark:text-white truncate max-w-[120px]">
-            {wp.title}
-          </h3>
-          <p className="text-[9px] font-medium text-black/40 dark:text-white/40 uppercase tracking-widest mt-0.5">
-            {wp.author}
-          </p>
-        </div>
-        <button 
+
+        {/* Gradient overlay on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+        {/* Quick like button on hover */}
+        <button
           onClick={(e) => onLike(e, wp.id)}
-          className={`transition-colors ${isLiked ? 'text-red-500' : 'text-black/10 dark:text-white/10 hover:text-black/30 dark:hover:text-white/30'}`}
+          className={`absolute bottom-3 right-3 size-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${isLiked
+            ? 'bg-red-500 text-white'
+            : 'bg-white/20 text-white hover:bg-white/30'
+            }`}
         >
-          <span className={`material-symbols-outlined text-[18px] ${isLiked ? 'fill-icon' : ''}`}>favorite</span>
+          <AnimateIcon animation={isLiked ? 'default' : 'initial'}>
+            <HeartIcon size={18} className={isLiked ? 'fill-current' : ''} />
+          </AnimateIcon>
         </button>
+      </div>
+
+      <div className="mt-3 px-1">
+        <h3 className="text-sm font-semibold text-primary dark:text-white truncate">
+          {wp.title}
+        </h3>
+        <p className="text-xs text-black/50 dark:text-white/50 mt-0.5">
+          by {wp.author}
+        </p>
       </div>
     </motion.div>
   );
 });
 
 export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWallpapers = [], onSearchClick }) => {
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState('Curated');
+  const [pexelsItems, setPexelsItems] = useState<WallpaperItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  const categories = ['All', 'Anime', 'Marvel', 'Cinema', 'Gaming', 'Space', 'Minimal'];
+  const categories = ['Curated', 'Live', 'Anime', 'Gaming', 'Nature', 'Abstract', 'Minimal', 'Dark', 'Space', 'City'];
 
-  const allWallpapers = useMemo(() => {
-    return [...customWallpapers, ...MOCK_WALLPAPERS];
-  }, [customWallpapers]);
+  // Fetch wallpapers from Pexels or Wallhaven
+  const fetchWallpapers = async (category: string, pageNum: number, append: boolean = false) => {
+    setLoading(true);
+    try {
+      let items: WallpaperItem[] = [];
 
-  const filteredWallpapers = useMemo(() => {
-    if (selectedCategory === 'All') return allWallpapers;
-    const query = selectedCategory.toLowerCase();
-    return allWallpapers.filter(wp => 
-      wp.tags.some(tag => tag.toLowerCase().includes(query))
-    );
-  }, [selectedCategory, allWallpapers]);
+      if (category === 'Curated') {
+        items = await pexelsService.getMixedFeed(pageNum);
+      } else if (category === 'Live') {
+        items = await pexelsService.getPopularVideos(pageNum, 20);
+      } else if (category === 'Anime') {
+        // Use Wallhaven for anime
+        const wallhavenItems = await wallhavenService.getAnime(pageNum);
+        items = wallhavenItems.map(w => ({
+          ...w,
+          videoUrl: undefined
+        }));
+      } else if (category === 'Gaming') {
+        // Use Wallhaven for gaming
+        const wallhavenItems = await wallhavenService.getGaming(pageNum);
+        items = wallhavenItems.map(w => ({
+          ...w,
+          videoUrl: undefined
+        }));
+      } else {
+        items = await pexelsService.getByCategory(category, pageNum);
+      }
 
-  const visibleWallpapers = useMemo(() => {
-    return filteredWallpapers.slice(0, page * ITEMS_PER_PAGE);
-  }, [filteredWallpapers, page]);
+      if (items.length === 0) {
+        setHasMore(false);
+      } else {
+        setPexelsItems(prev => append ? [...prev, ...items] : items);
+        setHasMore(items.length >= 15);
+      }
+    } catch (error) {
+      console.error('Failed to fetch wallpapers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Initial load and category change
+  useEffect(() => {
+    setPexelsItems([]);
+    setPage(1);
+    setHasMore(true);
+    fetchWallpapers(selectedCategory, 1, false);
+  }, [selectedCategory]);
+
+  // Infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && visibleWallpapers.length < filteredWallpapers.length) {
-          setPage(prev => prev + 1);
+        if (entries[0].isIntersecting && !loading && hasMore) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          fetchWallpapers(selectedCategory, nextPage, true);
         }
       },
       { rootMargin: '400px', threshold: 0.1 }
     );
     if (loaderRef.current) observer.observe(loaderRef.current);
     return () => observer.disconnect();
-  }, [visibleWallpapers.length, filteredWallpapers.length]);
+  }, [loading, hasMore, page, selectedCategory]);
 
   const toggleLike = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -117,29 +221,57 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
     onLike(id);
   };
 
+  const customItems: WallpaperItem[] = customWallpapers.map(wp => ({
+    id: wp.id,
+    title: wp.title,
+    url: wp.url,
+    thumbnailUrl: wp.url,
+    author: wp.author,
+    authorAvatar: wp.authorAvatar,
+    type: wp.type === 'live' ? 'video' : 'image',
+    tags: wp.tags,
+    views: typeof wp.views === 'string' ? parseInt(wp.views) || 0 : wp.views || 0,
+    downloads: typeof wp.downloads === 'string' ? parseInt(wp.downloads) || 0 : wp.downloads || 0,
+    likes: typeof wp.likes === 'string' ? parseInt(wp.likes) || 0 : wp.likes || 0,
+    width: 1080,
+    height: 1920,
+    videoUrl: wp.videoUrl
+  }));
+
+  // Filter items based on selected category
+  const getDisplayItems = (): WallpaperItem[] => {
+    if (selectedCategory === 'Curated') {
+      // Show custom uploads + Pexels mixed feed
+      return [...customItems, ...pexelsItems];
+    } else if (selectedCategory === 'Live') {
+      // Show ONLY items with actual video URLs
+      const liveCustom = customItems.filter(i => i.type === 'video' && i.videoUrl);
+      const liveVideos = pexelsItems.filter(i => i.type === 'video' && i.videoUrl);
+      return [...liveCustom, ...liveVideos];
+    } else {
+      // Show only Pexels items for other categories
+      return pexelsItems;
+    }
+  };
+
+  const allItems = getDisplayItems();
+
   return (
-    <div className="pb-32 px-6 lg:px-12">
+    <div className="pb-32 px-4 lg:px-12">
       {/* Header Section */}
-      <header className="py-12 lg:py-20 flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-        <div>
-          <h1 className="text-4xl lg:text-6xl font-black tracking-tighter leading-none mb-4">
-            Aura Gallery
-          </h1>
-          <p className="text-sm font-medium text-black/40 dark:text-white/40 max-w-sm uppercase tracking-widest">
-            Curated visual experiences for the high-end digital space.
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 -mx-6 px-6 lg:mx-0 lg:px-0">
+      <header className="py-3 lg:py-16">
+
+
+        {/* Categories */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 -mx-4 px-4 lg:mx-0 lg:px-0">
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => { setSelectedCategory(cat); setPage(1); soundService.playTick(); }}
-              className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border ${
-                selectedCategory === cat 
-                  ? 'bg-primary text-white border-primary dark:bg-white dark:text-black dark:border-white' 
-                  : 'bg-transparent text-black/30 border-black/5 dark:text-white/30 dark:border-white/5 hover:border-black/20 dark:hover:border-white/20'
-              }`}
+              onClick={() => { setSelectedCategory(cat); soundService.playTick(); }}
+              className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${selectedCategory === cat
+                ? 'bg-black dark:bg-white text-white dark:text-black'
+                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/20'
+                }`}
             >
               {cat}
             </button>
@@ -147,29 +279,51 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
         </div>
       </header>
 
+      {/* Loading skeleton for initial load */}
+      {loading && allItems.length === 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="space-y-3">
+              <Skeleton className="aspect-[3/4] rounded-2xl" />
+              <Skeleton className="h-4 w-3/4 rounded" />
+              <Skeleton className="h-3 w-1/2 rounded" />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
         <AnimatePresence>
-          {visibleWallpapers.map((wp, idx) => (
-            <WallpaperCard 
-              key={`${wp.id}-${idx}`}
-              wp={wp}
+          {allItems.map((item, idx) => (
+            <WallpaperCard
+              key={`${item.id}-${idx}`}
+              wp={toWallpaper(item)}
+              item={item}
               index={idx}
               onSelect={onSelect}
               onLike={toggleLike}
-              isLiked={likedIds.includes(wp.id)}
+              isLiked={likedIds.includes(item.id)}
             />
           ))}
         </AnimatePresence>
       </div>
 
-      {visibleWallpapers.length < filteredWallpapers.length && (
-        <div ref={loaderRef} className="py-32 flex items-center justify-center">
-          <motion.div 
+      {/* Load more indicator */}
+      {hasMore && allItems.length > 0 && (
+        <div ref={loaderRef} className="py-16 flex items-center justify-center">
+          <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-            className="size-6 border-2 border-black/10 dark:border-white/10 border-t-black dark:border-t-white rounded-full"
+            className="size-8 border-2 border-black/10 dark:border-white/10 border-t-accent rounded-full"
           />
+        </div>
+      )}
+
+      {/* No more results */}
+      {!hasMore && allItems.length > 0 && (
+        <div className="py-16 text-center text-sm text-black/40 dark:text-white/40">
+          You've seen all the wallpapers in this category
         </div>
       )}
     </div>

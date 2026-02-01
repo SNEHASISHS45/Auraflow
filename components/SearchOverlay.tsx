@@ -3,6 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallpaper } from '../types';
 import { soundService } from '../services/soundService';
+import { AnimateIcon } from './ui/AnimateIcon';
+import { ArrowLeftIcon } from './ui/Icons';
 
 interface SearchOverlayProps {
   wallpapers: Wallpaper[];
@@ -23,14 +25,14 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({ wallpapers, onSele
   const results = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return wallpapers.filter(wp => 
-      wp.title.toLowerCase().includes(q) || 
+    return wallpapers.filter(wp =>
+      wp.title.toLowerCase().includes(q) ||
       wp.tags.some(tag => tag.toLowerCase().includes(q))
     ).slice(0, 20);
   }, [query, wallpapers]);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -39,20 +41,22 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({ wallpapers, onSele
       {/* Header */}
       <div className="px-10 pt-16 pb-10 flex flex-col gap-12">
         <div className="flex items-center justify-between">
-          <button 
+          <button
             onClick={() => { soundService.playTick(); onClose(); }}
             className="group flex items-center gap-3 text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
           >
-            <span className="material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform">arrow_back</span>
+            <AnimateIcon animation="default">
+              <ArrowLeftIcon size={20} className="group-hover:-translate-x-1 transition-transform" />
+            </AnimateIcon>
             <span className="label-meta">Close Search</span>
           </button>
           <span className="label-meta text-[8px] text-black/20 dark:text-white/20">Aura Global Search</span>
         </div>
 
         <div className="relative group max-w-4xl">
-          <input 
+          <input
             ref={inputRef}
-            type="text" 
+            type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Enter search criteria..."
@@ -65,7 +69,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({ wallpapers, onSele
       <div className="flex-1 overflow-y-auto no-scrollbar px-10">
         <AnimatePresence mode="wait">
           {!query ? (
-            <motion.div 
+            <motion.div
               key="trending"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -74,7 +78,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({ wallpapers, onSele
               <p className="label-meta text-black/30 dark:text-white/30 mb-8 ml-1">Popular Queries</p>
               <div className="flex flex-wrap gap-3">
                 {TRENDING_TAGS.map((tag) => (
-                  <button 
+                  <button
                     key={tag}
                     onClick={() => { soundService.playTick(); setQuery(tag); }}
                     className="px-8 py-3 rounded-full border border-black/5 dark:border-white/5 text-[10px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white hover:text-white dark:hover:text-black transition-all"
@@ -85,7 +89,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({ wallpapers, onSele
               </div>
             </motion.div>
           ) : (
-            <motion.div 
+            <motion.div
               key="results"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -94,7 +98,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({ wallpapers, onSele
               <p className="label-meta text-black/30 dark:text-white/30 mb-10 ml-1">
                 {results.length} results matching '{query}'
               </p>
-              
+
               {results.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                   {results.map((wp, i) => (

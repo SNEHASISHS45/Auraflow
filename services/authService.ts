@@ -1,55 +1,73 @@
-
+import {
+  signInWithCredential,
+  signInWithPopup,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signOut as firebaseSignOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  User as FirebaseUser
+} from "firebase/auth";
+import { auth } from "./firebase";
 import { User } from '../types';
 
-const AUTH_KEY = 'aura_flow_user';
+const mapFirebaseUserToUser = (firebaseUser: FirebaseUser): User => ({
+  id: firebaseUser.uid,
+  name: firebaseUser.displayName || 'Anonymous',
+  username: firebaseUser.email?.split('@')[0] || 'user',
+  avatar: firebaseUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${firebaseUser.uid}`,
+  bio: 'Aura Creator',
+  followers: '0',
+  following: '0',
+  uploads: 0,
+  isElite: false
+});
 
 export const authService = {
   async signUp(name: string, email: string, password: string): Promise<User> {
-    const user: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      username: email.split('@')[0],
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-      bio: 'New Aura Creator',
-      followers: '0',
-      following: '0',
-      uploads: 0,
-      isElite: false
-    };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-    return user;
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, {
+      displayName: name,
+      photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
+    });
+    return mapFirebaseUserToUser(userCredential.user);
   },
 
   async signIn(email: string, password: string): Promise<User> {
-    // Simulated sign in
-    const stored = localStorage.getItem(AUTH_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    return this.signUp('Guest Creator', email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return mapFirebaseUserToUser(userCredential.user);
   },
 
   async signInWithGoogle(): Promise<User> {
-    return this.signUp('Google User', 'google@aura.flow', 'none');
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const userCredential = await signInWithPopup(auth, provider);
+    return mapFirebaseUserToUser(userCredential.user);
+  },
+
+  async signInWithGoogleToken(idToken: string): Promise<User> {
+    const credential = GoogleAuthProvider.credential(idToken);
+    const userCredential = await signInWithCredential(auth, credential);
+    return mapFirebaseUserToUser(userCredential.user);
   },
 
   async signOut() {
-    localStorage.removeItem(AUTH_KEY);
+    await firebaseSignOut(auth);
   },
 
   getCurrentUser(): User | null {
-    const stored = localStorage.getItem(AUTH_KEY);
-    return stored ? JSON.parse(stored) : null;
+    const firebaseUser = auth.currentUser;
+    return firebaseUser ? mapFirebaseUserToUser(firebaseUser) : null;
   },
 
   onAuthChange(callback: (user: User | null) => void) {
-    // Emit initial state
-    const user = this.getCurrentUser();
-    setTimeout(() => callback(user), 0);
-    
-    // Listen for storage changes if multiple tabs are open
-    const listener = () => callback(this.getCurrentUser());
-    window.addEventListener('storage', listener);
-    return () => window.removeEventListener('storage', listener);
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        callback(mapFirebaseUserToUser(firebaseUser));
+      } else {
+        callback(null);
+      }
+    });
   }
 };

@@ -1,92 +1,184 @@
-
-import { Wallpaper } from '../types';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  deleteDoc,
+  updateDoc,
+  increment,
+  doc,
+  Timestamp,
+  serverTimestamp
+} from "firebase/firestore";
+import { db } from "./firebase";
+import { Wallpaper, AppComment } from '../types';
 import { MOCK_WALLPAPERS } from '../constants';
 
-const DB_NAME = 'AuraFlowDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'wallpapers';
-
-class LocalDB {
-  private db: IDBDatabase | null = null;
-
-  async init(): Promise<IDBDatabase> {
-    if (this.db) return this.db;
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        }
-      };
-      request.onsuccess = () => {
-        this.db = request.result;
-        resolve(this.db);
-      };
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async save(wallpaper: Wallpaper): Promise<void> {
-    const db = await this.init();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.put({
-        ...wallpaper,
-        createdAt: new Date().toISOString()
-      });
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async getAll(): Promise<Wallpaper[]> {
-    const db = await this.init();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async delete(id: string): Promise<void> {
-    const db = await this.init();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.delete(id);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-    });
-  }
-}
-
-const localDB = new LocalDB();
+const COLLECTION_NAME = 'wallpapers';
 
 export const dbService = {
-  async saveWallpaper(wallpaper: Wallpaper): Promise<void> {
-    await localDB.save(wallpaper);
+  async saveWallpaper(wallpaper: Wallpaper): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+        ...wallpaper,
+        createdAt: serverTimestamp(),
+        visibility: wallpaper.visibility || 'public',
+        // Ensure some fields are numeric for easier sorting/filtering if needed
+        views: 0,
+        downloads: 0,
+        likes: 0
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error("Error saving wallpaper:", error);
+      throw error;
+    }
   },
 
   async getAllWallpapers(): Promise<Wallpaper[]> {
-    const localItems = await localDB.getAll();
-    // Combine local user uploads with the default mock collection
-    return [...localItems, ...MOCK_WALLPAPERS].sort((a, b) => {
-      const dateA = (a as any).createdAt || '0';
-      const dateB = (b as any).createdAt || '0';
-      return dateB.localeCompare(dateA);
-    });
+    try {
+      const q = query(collection(db, COLLECTION_NAME), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      const cloudItems = querySnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter((wp: any) => wp.visibility !== 'private') as Wallpaper[];
+
+      // Combine cloud uploads with mock wallpapers
+      return [...cloudItems, ...MOCK_WALLPAPERS];
+    } catch (error: any) {
+      if (error.code === 'permission-denied') {
+        console.error("🔥 Firestore Permission Denied! Update your security rules in the Firebase console.");
+      }
+      console.error("Error getting wallpapers:", error);
+      return MOCK_WALLPAPERS; // Fallback to mocks
+    }
   },
 
   async getUserWallpapers(userId: string): Promise<Wallpaper[]> {
-    const all = await localDB.getAll();
-    return all.filter(wp => (wp as any).authorId === userId);
+    try {
+      // Remove orderBy from the query to avoid needing a composite index
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where("authorId", "==", userId)
+      );
+      const querySnapshot = await getDocs(q);
+      const items = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Wallpaper[];
+
+      // Sort in memory instead
+      return items.sort((a: any, b: any) => {
+        const dateA = a.createdAt?.seconds || 0;
+        const dateB = b.createdAt?.seconds || 0;
+        return dateB - dateA;
+      });
+    } catch (error) {
+      console.error("Error getting user wallpapers:", error);
+      return [];
+    }
+  },
+
+  async updateWallpaper(id: string, updates: Partial<Wallpaper>): Promise<void> {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, id);
+      await updateDoc(docRef, updates);
+    } catch (error) {
+      console.error("Error updating wallpaper:", error);
+      throw error;
+    }
   },
 
   async deleteWallpaper(id: string): Promise<void> {
-    await localDB.delete(id);
+    try {
+      await deleteDoc(doc(db, COLLECTION_NAME, id));
+    } catch (error) {
+      console.error("Error deleting wallpaper:", error);
+      throw error;
+    }
+  },
+
+  async getNotifications(userId: string): Promise<any[]> {
+    try {
+      // Remove orderBy from the query to avoid needing a composite index
+      const q = query(
+        collection(db, 'notifications'),
+        where("userId", "==", userId)
+      );
+      const querySnapshot = await getDocs(q);
+      const items = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Sort in memory instead
+      return items.sort((a: any, b: any) => {
+        const dateA = a.createdAt?.seconds || 0;
+        const dateB = b.createdAt?.seconds || 0;
+        return dateB - dateA;
+      });
+    } catch (error) {
+      console.error("Error getting notifications:", error);
+      return [];
+    }
+  },
+
+  async saveNotification(notification: any): Promise<void> {
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        ...notification,
+        createdAt: serverTimestamp(),
+        isRead: false
+      });
+    } catch (error) {
+      console.error("Error saving notification:", error);
+    }
+  },
+
+  async addComment(comment: Partial<AppComment>): Promise<void> {
+    try {
+      await addDoc(collection(db, 'comments'), {
+        ...comment,
+        createdAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      throw error;
+    }
+  },
+
+  async getComments(wallpaperId: string): Promise<AppComment[]> {
+    try {
+      const q = query(
+        collection(db, 'comments'),
+        where("wallpaperId", "==", wallpaperId)
+      );
+      const querySnapshot = await getDocs(q);
+      const items = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as AppComment[];
+
+      return items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    } catch (error) {
+      console.error("Error getting comments:", error);
+      return [];
+    }
+  },
+
+  async incrementStats(wallpaperId: string, field: 'views' | 'downloads' | 'likes'): Promise<void> {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, wallpaperId);
+      await updateDoc(docRef, {
+        [field]: increment(1)
+      });
+    } catch (error) {
+      console.error("Error incrementing stats:", error);
+    }
   }
 };

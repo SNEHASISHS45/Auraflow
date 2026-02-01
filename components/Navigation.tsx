@@ -3,14 +3,18 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppTab } from '../types';
 import { soundService } from '../services/soundService';
+import { AnimateIcon } from './ui/AnimateIcon';
+import { HomeIcon, SearchIcon, PlusIcon, BookmarkIcon, UserIcon, BellIcon, ArrowLeftIcon, SparklesIcon } from './ui/Icons';
 
 const tabs = [
-  { id: AppTab.HOME, icon: 'grid_view', label: 'Gallery' },
-  { id: AppTab.EXPLORE, icon: 'search', label: 'Discover' },
-  { id: AppTab.UPLOAD, icon: 'add_circle', label: 'Create' },
-  { id: AppTab.SAVED, icon: 'bookmark', label: 'Saved' },
-  { id: AppTab.PROFILE, icon: 'person', label: 'Profile' }
+  { id: AppTab.HOME, icon: HomeIcon, label: 'Gallery' },
+  { id: AppTab.EXPLORE, icon: SearchIcon, label: 'Discover' },
+  { id: AppTab.UPLOAD, icon: PlusIcon, label: 'Create' },
+  { id: AppTab.SAVED, icon: BookmarkIcon, label: 'Saved' },
+  { id: AppTab.PROFILE, icon: UserIcon, label: 'Profile' }
 ];
+
+import { User } from '../types';
 
 interface NavProps {
   activeTab: AppTab;
@@ -19,14 +23,32 @@ interface NavProps {
   onToggleTheme?: () => void;
   canGoBack?: boolean;
   onBack?: () => void;
+  onNotificationOpen?: () => void;
+  currentUser?: User | null;
 }
 
-export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab }) => {
+export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, currentUser }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] pb-[env(safe-area-inset-bottom)] glass-nav border-t border-black/5 dark:border-white/5 lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] pb-[env(safe-area-inset-bottom)] bg-black border-t border-white/5 lg:hidden">
       <div className="flex items-center justify-around h-16 px-4">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
+
+          if (tab.id === AppTab.PROFILE && currentUser) {
+            return (
+              <button
+                key={tab.id}
+                onClick={() => { soundService.playTap(); setActiveTab(tab.id); }}
+                className={`relative flex flex-col items-center justify-center flex-1 h-full transition-all ${isActive ? 'text-primary dark:text-white' : 'text-black/20 dark:text-white/20'}`}
+              >
+                <div className={`size-6 rounded-full bg-cover bg-center border border-white/10 ${isActive ? 'ring-2 ring-white' : ''}`} style={{ backgroundImage: `url(${currentUser.avatar})` }} />
+                <span className="text-[8px] font-black uppercase tracking-tight mt-1">
+                  {tab.label}
+                </span>
+              </button>
+            );
+          }
+
           return (
             <button
               key={tab.id}
@@ -42,9 +64,9 @@ export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab }) => {
                   />
                 )}
               </AnimatePresence>
-              <span className={`material-symbols-outlined text-[24px] ${isActive ? 'fill-icon' : ''}`}>
-                {tab.icon}
-              </span>
+              <AnimateIcon animation={isActive ? 'default' : 'initial'}>
+                <tab.icon size={24} className={isActive ? 'fill-current' : ''} />
+              </AnimateIcon>
               <span className="text-[8px] font-black uppercase tracking-tight mt-1">
                 {tab.label}
               </span>
@@ -56,7 +78,7 @@ export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab }) => {
   );
 };
 
-export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, isDarkMode, onToggleTheme }) => {
+export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, isDarkMode, onToggleTheme, onNotificationOpen }) => {
   return (
     <aside className="hidden lg:flex flex-col w-72 h-screen border-r border-black/5 dark:border-white/5 bg-background-light dark:bg-background-dark p-12 z-[110]">
       <div className="mb-24">
@@ -72,9 +94,9 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, isDarkMod
               onClick={() => { soundService.playTap(); setActiveTab(tab.id); }}
               className={`w-full flex items-center gap-5 transition-all group ${isActive ? 'text-primary dark:text-white' : 'text-black/30 dark:text-white/30 hover:text-primary dark:hover:text-white'}`}
             >
-              <span className={`material-symbols-outlined text-[22px] transition-transform group-hover:scale-110 ${isActive ? 'fill-icon' : ''}`}>
-                {tab.icon}
-              </span>
+              <AnimateIcon animation={isActive ? 'default' : 'initial'}>
+                <tab.icon size={22} className={`transition-transform group-hover:scale-110 ${isActive ? 'fill-current' : ''}`} />
+              </AnimateIcon>
               <span className={`text-[12px] font-black uppercase tracking-[0.2em] ${isActive ? '' : ''}`}>
                 {tab.label}
               </span>
@@ -84,15 +106,18 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, isDarkMod
       </nav>
 
       <div className="pt-12 border-t border-black/5 dark:border-white/5 space-y-8">
-        <button 
-          onClick={() => { soundService.playTick(); onToggleTheme?.(); }}
+        <button
+          onClick={() => { soundService.playTick(); onNotificationOpen?.(); }}
           className="flex items-center gap-5 text-black/30 dark:text-white/30 hover:text-primary dark:hover:text-white transition-all group"
         >
-          <span className="material-symbols-outlined text-[22px] group-hover:rotate-12 transition-transform">
-            {isDarkMode ? 'light_mode' : 'dark_mode'}
-          </span>
+          <div className="relative">
+            <AnimateIcon animation="path">
+              <BellIcon size={22} className="group-hover:scale-110 transition-transform" />
+            </AnimateIcon>
+            <div className="absolute -top-1 -right-1 size-2 bg-accent rounded-full border-2 border-white dark:border-background-dark" />
+          </div>
           <span className="text-[12px] font-black uppercase tracking-[0.2em]">
-            {isDarkMode ? 'Light' : 'Dark'} Mode
+            Notifications
           </span>
         </button>
       </div>
@@ -100,29 +125,72 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, isDarkMod
   );
 };
 
-export const TopBar: React.FC<NavProps & { title: string; hideOnDesktop?: boolean }> = ({ title, hideOnDesktop, canGoBack, onBack, isDarkMode, onToggleTheme }) => {
+export const TopBar: React.FC<NavProps & { title: string; hideOnDesktop?: boolean; onSearchClick?: () => void }> = ({
+  title,
+  hideOnDesktop,
+  canGoBack,
+  onBack,
+  onNotificationOpen,
+  onSearchClick
+}) => {
+  const [isScrolled, setIsScrolled] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   if (hideOnDesktop) return null;
+
   return (
-    <header className="sticky top-0 z-[90] glass-nav px-6 h-16 flex items-center justify-between lg:hidden border-b border-black/5 dark:border-white/5">
+    <header
+      className={`sticky top-0 z-[90] px-6 h-16 flex items-center justify-between lg:hidden transition-all duration-300 ${isScrolled
+        ? 'glass-nav border-b border-white/5'
+        : 'bg-transparent'
+        }`}
+    >
       <div className="flex items-center gap-4">
         {canGoBack ? (
           <button onClick={onBack} className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+            <AnimateIcon animation="default">
+              <ArrowLeftIcon size={24} />
+            </AnimateIcon>
           </button>
         ) : (
-          <span className="material-symbols-outlined text-[24px] text-accent">blur_on</span>
+          <AnimateIcon animation="default">
+            <SparklesIcon size={24} className="text-accent" />
+          </AnimateIcon>
         )}
         <h2 className="text-[12px] font-black uppercase tracking-[0.2em]">{title}</h2>
       </div>
-      
-      <button 
-        onClick={() => { soundService.playTick(); onToggleTheme?.(); }}
-        className="size-10 rounded-full flex items-center justify-center text-black/40 dark:text-white/40"
-      >
-        <span className="material-symbols-outlined text-[22px]">
-          {isDarkMode ? 'light_mode' : 'dark_mode'}
-        </span>
-      </button>
+
+      <div className="flex items-center gap-2">
+        {/* Search Button */}
+        {onSearchClick && (
+          <button
+            onClick={() => { soundService.playTick(); onSearchClick(); }}
+            className="size-10 rounded-full flex items-center justify-center text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70 transition-colors"
+          >
+            <AnimateIcon animation="path">
+              <SearchIcon size={20} />
+            </AnimateIcon>
+          </button>
+        )}
+
+        {/* Notification Button */}
+        <button
+          onClick={() => { soundService.playTick(); onNotificationOpen?.(); }}
+          className="size-10 rounded-full flex items-center justify-center text-black/40 dark:text-white/40 relative"
+        >
+          <AnimateIcon animation="default">
+            <BellIcon size={22} />
+          </AnimateIcon>
+          <div className="absolute top-2 right-2 size-2 bg-accent rounded-full border-2 border-white dark:border-background-dark" />
+        </button>
+      </div>
     </header>
   );
 };

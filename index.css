@@ -5,11 +5,14 @@
   --color-accent: #2b6cee;
   --color-background-dark: #000000;
   --color-background-light: #ffffff;
+  --color-surface-dark: rgba(255, 255, 255, 0.05);
+  --color-surface-light: rgba(0, 0, 0, 0.03);
 
   --font-display: "Plus Jakarta Sans", sans-serif;
   --font-mono: "Space Grotesk", monospace;
 
   --animate-slide-in: slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 2s infinite linear;
 
   @keyframes slide-in {
     from {
@@ -19,6 +22,28 @@
     to {
       transform: translateX(0);
     }
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: -200% 0;
+    }
+
+    to {
+      background-position: 200% 0;
+    }
+  }
+}
+
+@layer utilities {
+  .skeleton {
+    @apply bg-linear-to-r from-black/5 via-black/10 to-black/5 dark:from-white/5 dark:via-white/10 dark:to-white/5 bg-[length:200%_100%] animate-shimmer;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background-light text-primary dark:bg-background-dark dark:text-white;
   }
 }
 

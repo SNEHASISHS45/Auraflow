@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { soundService } from '../services/soundService';
+import { AnimateIcon } from './ui/AnimateIcon';
+import { SparklesIcon, PlusIcon } from './ui/Icons';
 
 interface PWAInstallBannerProps {
   deferredPrompt: any;
@@ -52,7 +54,7 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({ deferredProm
         {/* Progress Bar Background */}
         <div className="absolute bottom-0 left-0 h-1.5 bg-slate-100 dark:bg-white/5 w-full" />
         {/* Animated Progress Bar */}
-        <motion.div 
+        <motion.div
           className="absolute bottom-0 left-0 h-1.5 bg-primary"
           initial={{ width: "100%" }}
           animate={{ width: "0%" }}
@@ -61,13 +63,9 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({ deferredProm
 
         <div className="flex items-start gap-5 mb-8">
           <div className="size-16 bg-gradient-to-br from-primary to-accent rounded-[22px] flex items-center justify-center shadow-xl shrink-0">
-            <motion.span 
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
-              className="material-symbols-outlined text-white text-4xl fill-icon"
-            >
-              blur_on
-            </motion.span>
+            <AnimateIcon animation="default">
+              <SparklesIcon size={36} className="text-white" />
+            </AnimateIcon>
           </div>
           <div>
             <h3 className="text-xl font-black tracking-tighter mb-1.5">Install AuraFlow</h3>
@@ -76,14 +74,16 @@ export const PWAInstallBanner: React.FC<PWAInstallBannerProps> = ({ deferredProm
         </div>
 
         <div className="flex gap-4">
-          <button 
+          <button
             onClick={handleInstall}
             className="flex-[1.5] h-14 bg-primary text-white rounded-[22px] font-black text-[11px] uppercase tracking-widest shadow-huge shadow-primary/20 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
-            <span className="material-symbols-outlined text-[20px]">add_to_home_screen</span>
+            <AnimateIcon animation="default">
+              <PlusIcon size={18} />
+            </AnimateIcon>
             {isIOS ? 'Show Steps' : 'Install Now'}
           </button>
-          <button 
+          <button
             onClick={() => { soundService.playTick(); onClose(); }}
             className="flex-1 h-14 bg-slate-100 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-[22px] font-black text-[11px] uppercase tracking-widest text-slate-400 dark:text-white/40 active:scale-95 transition-all"
           >

@@ -1,0 +1,143 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // WALLPAPERS COLLECTION
+    // ============================================
+    match /wallpapers/{wallpaperId} {
+      // Anyone can read wallpapers (public gallery)
+      allow read: if true;
+      
+      // Only authenticated users can create wallpapers
+      allow create: if request.auth != null;
+      
+      // Update rules:
+      // 1. Author can update anything on their own wallpaper
+      // 2. ANYONE (even unauthenticated) can increment views/downloads/likes
+      allow update: if 
+        (request.auth != null && request.auth.uid == resource.data.authorId) || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'downloads', 'likes']);
+      
+      // Only the author can delete their wallpaper
+      allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+    }
+
+    // ============================================
+    // COMMENTS COLLECTION
+    // ============================================
+    match /comments/{commentId} {
+      // Anyone can read comments
+      allow read: if true;
+      
+      // Only authenticated users can create comments
+      allow create: if request.auth != null;
+      
+      // Users can update their own comments
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // Users can delete their own comments
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // ============================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================
+    match /notifications/{notificationId} {
+      // Users can only read their own notifications
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // Any authenticated user can create notifications (for likes, follows, etc.)
+      allow create: if request.auth != null;
+      
+      // Users can update/delete their own notifications (mark as read, dismiss)
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // ============================================
+    // USER PROFILES COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Anyone can read user profiles (public profiles)
+      allow read: if true;
+      
+      // Users can only write to their own profile
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // COLLECTIONS (curated wallpaper collections)
+    // ============================================
+    match /collections/{collectionId} {
+      // Anyone can read collections
+      allow read: if true;
+      
+      // Only authenticated users can create collections
+      allow create: if request.auth != null;
+      
+      // Only the author can update/delete their collection
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+    }
+
+    // ============================================
+    // LIKES COLLECTION (for tracking who liked what)
+    // ============================================
+    match /likes/{likeId} {
+      // Anyone can read likes
+      allow read: if true;
+      
+      // Authenticated users can create/delete their own likes
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // ============================================
+    // SAVES/BOOKMARKS COLLECTION
+    // ============================================
+    match /saves/{saveId} {
+      // Users can only read their own saves
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // Authenticated users can create/delete their own saves
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // ============================================
+    // FOLLOWERS COLLECTION
+    // ============================================
+    match /followers/{followId} {
+      // Anyone can read follower relationships
+      allow read: if true;
+      
+      // Authenticated users can create/delete follow relationships
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null && 
+        (request.auth.uid == resource.data.followerId || request.auth.uid == resource.data.followingId);
+    }
+
+    // ============================================
+    // REPORTS COLLECTION (for reporting content)
+    // ============================================
+    match /reports/{reportId} {
+      // Only admins should read reports (customize as needed)
+      allow read: if false;
+      
+      // Any authenticated user can create a report
+      allow create: if request.auth != null;
+      
+      // No one can update or delete reports
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // FALLBACK: Deny all other collections
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
