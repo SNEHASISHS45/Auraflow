@@ -61,23 +61,17 @@ export const dbService = {
 
   async getUserWallpapers(userId: string): Promise<Wallpaper[]> {
     try {
-      // Remove orderBy from the query to avoid needing a composite index
+      // Uses a composite index on [authorId, createdAt] for server-side sorting
       const q = query(
         collection(db, COLLECTION_NAME),
-        where("authorId", "==", userId)
+        where("authorId", "==", userId),
+        orderBy("createdAt", "desc")
       );
       const querySnapshot = await getDocs(q);
-      const items = querySnapshot.docs.map(doc => ({
+      return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Wallpaper[];
-
-      // Sort in memory instead
-      return items.sort((a: any, b: any) => {
-        const dateA = a.createdAt?.seconds || 0;
-        const dateB = b.createdAt?.seconds || 0;
-        return dateB - dateA;
-      });
     } catch (error) {
       console.error("Error getting user wallpapers:", error);
       return [];
