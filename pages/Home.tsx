@@ -297,7 +297,7 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
         <AnimatePresence>
           {allItems.map((item, idx) => (
             <WallpaperCard
-              key={`${item.id}-${idx}`}
+              key={item.id}
               wp={toWallpaper(item)}
               item={item}
               index={idx}
