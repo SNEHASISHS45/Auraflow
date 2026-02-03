@@ -5,6 +5,7 @@ import { geminiService } from '../services/geminiService';
 import { soundService } from '../services/soundService';
 import { AnimateIcon } from '../components/ui/AnimateIcon';
 import { BrainIcon, SparklesIcon, GridIcon } from '../components/ui/Icons';
+import { MoodVisualization } from '../components/MoodVisualization';
 
 export const MoodDiscovery: React.FC = () => {
   const x = useMotionValue(0);
@@ -12,6 +13,7 @@ export const MoodDiscovery: React.FC = () => {
 
   const [mood, setMood] = useState('Neutral Aura');
   const [resultDescription, setResultDescription] = useState('');
+  const [moodCoords, setMoodCoords] = useState({ x: 0, y: 0 });
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
 
@@ -24,8 +26,12 @@ export const MoodDiscovery: React.FC = () => {
     setLoading(true);
     setShowResult(false);
     try {
+      const currentX = x.get() / 120;
+      const currentY = y.get() / 120;
+      setMoodCoords({ x: currentX, y: currentY });
+
       // Fetch actual description from Gemini for the selected mood coordinates
-      const prompt = await geminiService.getMoodPrompt(x.get() / 120, y.get() / 120);
+      const prompt = await geminiService.getMoodPrompt(currentX, currentY);
       const parts = prompt.split('.');
       setMood(parts[0] || 'Custom Energy');
       setResultDescription(parts.slice(1).join('.') || 'Synchronized visual harmonics generated from your spatial input.');
@@ -109,23 +115,7 @@ export const MoodDiscovery: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center text-center max-w-md"
           >
-            {/* AI Generated Visualization Placeholder */}
-            <div className="relative size-64 mb-10">
-              <motion.div
-                animate={{
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 90, 180, 270, 360],
-                  borderRadius: ["40%", "50%", "40%"]
-                }}
-                transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
-                className="absolute inset-0 bg-gradient-to-br from-primary via-accent to-pink-500 blur-3xl opacity-50"
-              />
-              <div className="relative z-10 size-full rounded-[3rem] overflow-hidden border border-white/20 backdrop-blur-md flex items-center justify-center bg-black/20">
-                <AnimateIcon animation="path-loop">
-                  <SparklesIcon size={72} className="text-white/20" />
-                </AnimateIcon>
-              </div>
-            </div>
+            <MoodVisualization energy={moodCoords.x} brightness={moodCoords.y} />
 
             <h2 className="text-3xl font-black mb-4 tracking-tighter">{mood}</h2>
             <p className="text-white/60 text-sm leading-relaxed mb-10 px-4 italic">"{resultDescription}"</p>
