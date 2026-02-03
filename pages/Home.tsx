@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wallpaper } from '../types';
 import { soundService } from '../services/soundService';
@@ -33,20 +33,21 @@ const toWallpaper = (item: WallpaperItem): Wallpaper => ({
 });
 
 const WallpaperCard = React.memo(({
-  wp,
   item,
   onSelect,
   onLike,
   isLiked,
   index
 }: {
-  wp: Wallpaper;
   item: WallpaperItem;
   onSelect: (w: Wallpaper) => void;
   onLike: (e: React.MouseEvent, id: string) => void;
   isLiked: boolean;
   index: number;
 }) => {
+  // Memoize the wallpaper object so it doesn't change on every render
+  const wp = useMemo(() => toWallpaper(item), [item]);
+
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -215,13 +216,13 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
     return () => observer.disconnect();
   }, [loading, hasMore, page, selectedCategory]);
 
-  const toggleLike = (e: React.MouseEvent, id: string) => {
+  const toggleLike = useCallback((e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     soundService.playTick();
     onLike(id);
-  };
+  }, [onLike]);
 
-  const customItems: WallpaperItem[] = customWallpapers.map(wp => ({
+  const customItems: WallpaperItem[] = useMemo(() => customWallpapers.map(wp => ({
     id: wp.id,
     title: wp.title,
     url: wp.url,
@@ -236,10 +237,10 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
     width: 1080,
     height: 1920,
     videoUrl: wp.videoUrl
-  }));
+  })), [customWallpapers]);
 
   // Filter items based on selected category
-  const getDisplayItems = (): WallpaperItem[] => {
+  const allItems = useMemo(() => {
     if (selectedCategory === 'Curated') {
       // Show custom uploads + Pexels mixed feed
       return [...customItems, ...pexelsItems];
@@ -252,9 +253,7 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
       // Show only Pexels items for other categories
       return pexelsItems;
     }
-  };
-
-  const allItems = getDisplayItems();
+  }, [selectedCategory, customItems, pexelsItems]);
 
   return (
     <div className="pb-32 px-4 lg:px-12">
@@ -298,7 +297,6 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
           {allItems.map((item, idx) => (
             <WallpaperCard
               key={`${item.id}-${idx}`}
-              wp={toWallpaper(item)}
               item={item}
               index={idx}
               onSelect={onSelect}
