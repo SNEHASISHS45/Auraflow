@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppTab, Wallpaper, User } from './types';
 import { BottomNav, TopBar, Sidebar } from './components/Navigation';
-import { Home } from './pages/Home';
-import { Explore } from './pages/Explore';
-import { Upload } from './pages/Upload';
-import { Detail } from './pages/Detail';
-import { Profile } from './pages/Profile';
-import { Saved } from './pages/Saved';
-import { Auth } from './pages/Auth';
-import { SearchOverlay } from './components/SearchOverlay';
+const Home = React.lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
+const Explore = React.lazy(() => import('./pages/Explore').then(module => ({ default: module.Explore })));
+const Upload = React.lazy(() => import('./pages/Upload').then(module => ({ default: module.Upload })));
+const Detail = React.lazy(() => import('./pages/Detail').then(module => ({ default: module.Detail })));
+const Profile = React.lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })));
+const Saved = React.lazy(() => import('./pages/Saved').then(module => ({ default: module.Saved })));
+const Auth = React.lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
+const SearchOverlay = React.lazy(() => import('./components/SearchOverlay').then(module => ({ default: module.SearchOverlay })));
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { NotificationPanel } from './components/NotificationPanel';
 import { ProfileSkeleton } from './components/Skeleton';
@@ -149,8 +149,9 @@ const App: React.FC = () => {
         />
 
         <main className="flex-1 overflow-y-auto no-scrollbar relative">
-          <AnimatePresence>
-            <Routes location={location}>
+          <React.Suspense fallback={<ProfileSkeleton />}>
+            <AnimatePresence>
+              <Routes location={location}>
               <Route path="/" element={
                 <motion.div
                   initial={{ opacity: 0, scale: 0.98 }}
@@ -236,9 +237,10 @@ const App: React.FC = () => {
                   />
                 </motion.div>
               } />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </AnimatePresence>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </AnimatePresence>
+          </React.Suspense>
         </main>
 
         {!isDesktop && <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} currentUser={currentUser} />}
@@ -246,43 +248,51 @@ const App: React.FC = () => {
 
       <AnimatePresence>
         {selectedWallpaper && (
-          <Detail
-            wallpaper={selectedWallpaper}
-            isLiked={likedIds.includes(selectedWallpaper.id)}
-            isSaved={savedIds.includes(selectedWallpaper.id)}
-            currentUser={currentUser}
-            onClose={() => setSelectedWallpaper(null)}
-            onLike={() => {
-              setLikedIds(prev => {
-                const next = prev.includes(selectedWallpaper.id)
-                  ? prev.filter(i => i !== selectedWallpaper.id)
-                  : [...prev, selectedWallpaper.id];
-                localStorage.setItem('aura_liked_ids', JSON.stringify(next));
-                return next;
-              });
-            }}
-            onSave={() => {
-              setSavedIds(prev => {
-                const next = prev.includes(selectedWallpaper.id)
-                  ? prev.filter(i => i !== selectedWallpaper.id)
-                  : [...prev, selectedWallpaper.id];
-                localStorage.setItem('aura_saved_ids', JSON.stringify(next));
-                return next;
-              });
-            }}
-            onBack={() => setSelectedWallpaper(null)}
-          />
+          <React.Suspense fallback={null}>
+            <Detail
+              wallpaper={selectedWallpaper}
+              isLiked={likedIds.includes(selectedWallpaper.id)}
+              isSaved={savedIds.includes(selectedWallpaper.id)}
+              currentUser={currentUser}
+              onClose={() => setSelectedWallpaper(null)}
+              onLike={() => {
+                setLikedIds(prev => {
+                  const next = prev.includes(selectedWallpaper.id)
+                    ? prev.filter(i => i !== selectedWallpaper.id)
+                    : [...prev, selectedWallpaper.id];
+                  localStorage.setItem('aura_liked_ids', JSON.stringify(next));
+                  return next;
+                });
+              }}
+              onSave={() => {
+                setSavedIds(prev => {
+                  const next = prev.includes(selectedWallpaper.id)
+                    ? prev.filter(i => i !== selectedWallpaper.id)
+                    : [...prev, selectedWallpaper.id];
+                  localStorage.setItem('aura_saved_ids', JSON.stringify(next));
+                  return next;
+                });
+              }}
+              onBack={() => setSelectedWallpaper(null)}
+            />
+          </React.Suspense>
         )}
 
         {isSearchOpen && (
-          <SearchOverlay
-            wallpapers={wallpapers}
-            onSelect={(wp) => { setSelectedWallpaper(wp); setIsSearchOpen(false); }}
-            onClose={() => setIsSearchOpen(false)}
-          />
+          <React.Suspense fallback={null}>
+            <SearchOverlay
+              wallpapers={wallpapers}
+              onSelect={(wp) => { setSelectedWallpaper(wp); setIsSearchOpen(false); }}
+              onClose={() => setIsSearchOpen(false)}
+            />
+          </React.Suspense>
         )}
 
-        {showAuth && <Auth onSuccess={setCurrentUser} onClose={() => setShowAuth(false)} onBack={() => setShowAuth(false)} />}
+        {showAuth && (
+          <React.Suspense fallback={null}>
+            <Auth onSuccess={setCurrentUser} onClose={() => setShowAuth(false)} onBack={() => setShowAuth(false)} />
+          </React.Suspense>
+        )}
       </AnimatePresence>
 
       {showInstallBanner && <PWAInstallBanner deferredPrompt={deferredPrompt} onClose={() => setShowInstallBanner(false)} />}
