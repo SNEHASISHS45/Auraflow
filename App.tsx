@@ -42,6 +42,14 @@ const App: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
+  const handleLike = useCallback((id: string) => {
+    setLikedIds(prev => {
+      const next = prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
+      localStorage.setItem('aura_liked_ids', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const handleBack = useCallback(() => {
     if (selectedWallpaper) {
       setSelectedWallpaper(null);
@@ -159,13 +167,12 @@ const App: React.FC = () => {
                   transition={{ duration: 0.2 }}
                   className="h-full"
                 >
-                  <Home onSelect={setSelectedWallpaper} likedIds={likedIds} onLike={(id) => {
-                    setLikedIds(prev => {
-                      const next = prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
-                      localStorage.setItem('aura_liked_ids', JSON.stringify(next));
-                      return next;
-                    });
-                  }} customWallpapers={wallpapers} />
+                  <Home
+                    onSelect={setSelectedWallpaper}
+                    likedIds={likedIds}
+                    onLike={handleLike}
+                    customWallpapers={wallpapers}
+                  />
                 </motion.div>
               } />
               <Route path="/explore" element={
@@ -252,15 +259,7 @@ const App: React.FC = () => {
             isSaved={savedIds.includes(selectedWallpaper.id)}
             currentUser={currentUser}
             onClose={() => setSelectedWallpaper(null)}
-            onLike={() => {
-              setLikedIds(prev => {
-                const next = prev.includes(selectedWallpaper.id)
-                  ? prev.filter(i => i !== selectedWallpaper.id)
-                  : [...prev, selectedWallpaper.id];
-                localStorage.setItem('aura_liked_ids', JSON.stringify(next));
-                return next;
-              });
-            }}
+            onLike={() => handleLike(selectedWallpaper.id)}
             onSave={() => {
               setSavedIds(prev => {
                 const next = prev.includes(selectedWallpaper.id)
