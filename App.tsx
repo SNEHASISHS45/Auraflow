@@ -1,15 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppTab, Wallpaper, User } from './types';
 import { BottomNav, TopBar, Sidebar } from './components/Navigation';
-import { Home } from './pages/Home';
-import { Explore } from './pages/Explore';
-import { Upload } from './pages/Upload';
-import { Detail } from './pages/Detail';
-import { Profile } from './pages/Profile';
-import { Saved } from './pages/Saved';
-import { Auth } from './pages/Auth';
-import { SearchOverlay } from './components/SearchOverlay';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { NotificationPanel } from './components/NotificationPanel';
 import { ProfileSkeleton } from './components/Skeleton';
@@ -17,6 +9,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from './services/dbService';
 import { authService } from './services/authService';
 import { soundService } from './services/soundService';
+
+const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
+const Explore = lazy(() => import('./pages/Explore').then(module => ({ default: module.Explore })));
+const Upload = lazy(() => import('./pages/Upload').then(module => ({ default: module.Upload })));
+const Detail = lazy(() => import('./pages/Detail').then(module => ({ default: module.Detail })));
+const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })));
+const Saved = lazy(() => import('./pages/Saved').then(module => ({ default: module.Saved })));
+const Auth = lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
+const SearchOverlay = lazy(() => import('./components/SearchOverlay').then(module => ({ default: module.SearchOverlay })));
+
+const OverlayFallback = () => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+  </div>
+);
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -150,8 +157,9 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto no-scrollbar relative">
           <AnimatePresence>
-            <Routes location={location}>
-              <Route path="/" element={
+            <Suspense fallback={<ProfileSkeleton />}>
+              <Routes location={location}>
+                <Route path="/" element={
                 <motion.div
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -236,8 +244,9 @@ const App: React.FC = () => {
                   />
                 </motion.div>
               } />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
           </AnimatePresence>
         </main>
 
@@ -246,43 +255,51 @@ const App: React.FC = () => {
 
       <AnimatePresence>
         {selectedWallpaper && (
-          <Detail
-            wallpaper={selectedWallpaper}
-            isLiked={likedIds.includes(selectedWallpaper.id)}
-            isSaved={savedIds.includes(selectedWallpaper.id)}
-            currentUser={currentUser}
-            onClose={() => setSelectedWallpaper(null)}
-            onLike={() => {
-              setLikedIds(prev => {
-                const next = prev.includes(selectedWallpaper.id)
-                  ? prev.filter(i => i !== selectedWallpaper.id)
-                  : [...prev, selectedWallpaper.id];
-                localStorage.setItem('aura_liked_ids', JSON.stringify(next));
-                return next;
-              });
-            }}
-            onSave={() => {
-              setSavedIds(prev => {
-                const next = prev.includes(selectedWallpaper.id)
-                  ? prev.filter(i => i !== selectedWallpaper.id)
-                  : [...prev, selectedWallpaper.id];
-                localStorage.setItem('aura_saved_ids', JSON.stringify(next));
-                return next;
-              });
-            }}
-            onBack={() => setSelectedWallpaper(null)}
-          />
+          <Suspense fallback={<OverlayFallback />}>
+            <Detail
+              wallpaper={selectedWallpaper}
+              isLiked={likedIds.includes(selectedWallpaper.id)}
+              isSaved={savedIds.includes(selectedWallpaper.id)}
+              currentUser={currentUser}
+              onClose={() => setSelectedWallpaper(null)}
+              onLike={() => {
+                setLikedIds(prev => {
+                  const next = prev.includes(selectedWallpaper.id)
+                    ? prev.filter(i => i !== selectedWallpaper.id)
+                    : [...prev, selectedWallpaper.id];
+                  localStorage.setItem('aura_liked_ids', JSON.stringify(next));
+                  return next;
+                });
+              }}
+              onSave={() => {
+                setSavedIds(prev => {
+                  const next = prev.includes(selectedWallpaper.id)
+                    ? prev.filter(i => i !== selectedWallpaper.id)
+                    : [...prev, selectedWallpaper.id];
+                  localStorage.setItem('aura_saved_ids', JSON.stringify(next));
+                  return next;
+                });
+              }}
+              onBack={() => setSelectedWallpaper(null)}
+            />
+          </Suspense>
         )}
 
         {isSearchOpen && (
-          <SearchOverlay
-            wallpapers={wallpapers}
-            onSelect={(wp) => { setSelectedWallpaper(wp); setIsSearchOpen(false); }}
-            onClose={() => setIsSearchOpen(false)}
-          />
+          <Suspense fallback={<OverlayFallback />}>
+            <SearchOverlay
+              wallpapers={wallpapers}
+              onSelect={(wp) => { setSelectedWallpaper(wp); setIsSearchOpen(false); }}
+              onClose={() => setIsSearchOpen(false)}
+            />
+          </Suspense>
         )}
 
-        {showAuth && <Auth onSuccess={setCurrentUser} onClose={() => setShowAuth(false)} onBack={() => setShowAuth(false)} />}
+        {showAuth && (
+          <Suspense fallback={<OverlayFallback />}>
+            <Auth onSuccess={setCurrentUser} onClose={() => setShowAuth(false)} onBack={() => setShowAuth(false)} />
+          </Suspense>
+        )}
       </AnimatePresence>
 
       {showInstallBanner && <PWAInstallBanner deferredPrompt={deferredPrompt} onClose={() => setShowInstallBanner(false)} />}
