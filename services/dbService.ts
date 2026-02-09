@@ -39,14 +39,16 @@ export const dbService = {
 
   async getAllWallpapers(): Promise<Wallpaper[]> {
     try {
-      const q = query(collection(db, COLLECTION_NAME), orderBy("createdAt", "desc"));
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where("visibility", "==", "public"),
+        orderBy("createdAt", "desc")
+      );
       const querySnapshot = await getDocs(q);
-      const cloudItems = querySnapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        .filter((wp: any) => wp.visibility !== 'private') as Wallpaper[];
+      const cloudItems = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Wallpaper[];
 
       // Combine cloud uploads with mock wallpapers
       return [...cloudItems, ...MOCK_WALLPAPERS];
