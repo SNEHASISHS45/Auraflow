@@ -1,16 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppTab, Wallpaper, User } from './types';
 import { BottomNav, TopBar, Sidebar } from './components/Navigation';
 import { Home } from './pages/Home';
-import { Explore } from './pages/Explore';
-import { Upload } from './pages/Upload';
-import { Detail } from './pages/Detail';
-import { Profile } from './pages/Profile';
-import { Saved } from './pages/Saved';
-import { Auth } from './pages/Auth';
-import { SearchOverlay } from './components/SearchOverlay';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
+
+// Lazy load heavy components
+// Optimization: Code splitting reduces initial bundle size by lazy loading these routes.
+// Expected impact: ~70kB raw / ~22kB gzip reduction in initial JS payload.
+const Explore = lazy(() => import('./pages/Explore').then(module => ({ default: module.Explore })));
+const Upload = lazy(() => import('./pages/Upload').then(module => ({ default: module.Upload })));
+const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })));
+const Saved = lazy(() => import('./pages/Saved').then(module => ({ default: module.Saved })));
+const Detail = lazy(() => import('./pages/Detail').then(module => ({ default: module.Detail })));
+const Auth = lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
+const SearchOverlay = lazy(() => import('./components/SearchOverlay').then(module => ({ default: module.SearchOverlay })));
 import { NotificationPanel } from './components/NotificationPanel';
 import { ProfileSkeleton } from './components/Skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -176,7 +180,9 @@ const App: React.FC = () => {
                   transition={{ duration: 0.2 }}
                   className="h-full"
                 >
-                  <Explore onSelect={setSelectedWallpaper} />
+                  <Suspense fallback={<ProfileSkeleton />}>
+                    <Explore onSelect={setSelectedWallpaper} />
+                  </Suspense>
                 </motion.div>
               } />
               <Route path="/upload" element={
@@ -187,19 +193,21 @@ const App: React.FC = () => {
                   transition={{ duration: 0.2 }}
                   className="h-full"
                 >
-                  <Upload onUploadSuccess={async (wp) => {
-                    if (currentUser) {
-                      const wallpaperData = {
-                        ...wp,
-                        author: currentUser.name,
-                        authorAvatar: currentUser.avatar,
-                        authorId: currentUser.id
-                      };
-                      await dbService.saveWallpaper(wallpaperData);
-                      navigate('/');
-                      refreshWallpapers();
-                    }
-                  }} currentUser={currentUser} onAuthRequired={() => setShowAuth(true)} />
+                  <Suspense fallback={<ProfileSkeleton />}>
+                    <Upload onUploadSuccess={async (wp) => {
+                      if (currentUser) {
+                        const wallpaperData = {
+                          ...wp,
+                          author: currentUser.name,
+                          authorAvatar: currentUser.avatar,
+                          authorId: currentUser.id
+                        };
+                        await dbService.saveWallpaper(wallpaperData);
+                        navigate('/');
+                        refreshWallpapers();
+                      }
+                    }} currentUser={currentUser} onAuthRequired={() => setShowAuth(true)} />
+                  </Suspense>
                 </motion.div>
               } />
               <Route path="/saved" element={
@@ -210,7 +218,9 @@ const App: React.FC = () => {
                   transition={{ duration: 0.2 }}
                   className="h-full"
                 >
-                  <Saved onSelect={setSelectedWallpaper} savedIds={savedIds} wallpapers={wallpapers} />
+                  <Suspense fallback={<ProfileSkeleton />}>
+                    <Saved onSelect={setSelectedWallpaper} savedIds={savedIds} wallpapers={wallpapers} />
+                  </Suspense>
                 </motion.div>
               } />
               <Route path="/profile" element={
@@ -221,19 +231,21 @@ const App: React.FC = () => {
                   transition={{ duration: 0.2 }}
                   className="h-full"
                 >
-                  <Profile
-                    currentUser={currentUser}
-                    onUserUpdate={(updatedUser) => {
-                      setCurrentUser(updatedUser);
-                    }}
-                    onSignInClick={() => setShowAuth(true)}
-                    onSignOut={async () => {
-                      await authService.signOut();
-                      setCurrentUser(null);
-                      soundService.playSuccess();
-                    }}
-                    onRefresh={refreshWallpapers}
-                  />
+                  <Suspense fallback={<ProfileSkeleton />}>
+                    <Profile
+                      currentUser={currentUser}
+                      onUserUpdate={(updatedUser) => {
+                        setCurrentUser(updatedUser);
+                      }}
+                      onSignInClick={() => setShowAuth(true)}
+                      onSignOut={async () => {
+                        await authService.signOut();
+                        setCurrentUser(null);
+                        soundService.playSuccess();
+                      }}
+                      onRefresh={refreshWallpapers}
+                    />
+                  </Suspense>
                 </motion.div>
               } />
               <Route path="*" element={<Navigate to="/" replace />} />
@@ -246,43 +258,51 @@ const App: React.FC = () => {
 
       <AnimatePresence>
         {selectedWallpaper && (
-          <Detail
-            wallpaper={selectedWallpaper}
-            isLiked={likedIds.includes(selectedWallpaper.id)}
-            isSaved={savedIds.includes(selectedWallpaper.id)}
-            currentUser={currentUser}
-            onClose={() => setSelectedWallpaper(null)}
-            onLike={() => {
-              setLikedIds(prev => {
-                const next = prev.includes(selectedWallpaper.id)
-                  ? prev.filter(i => i !== selectedWallpaper.id)
-                  : [...prev, selectedWallpaper.id];
-                localStorage.setItem('aura_liked_ids', JSON.stringify(next));
-                return next;
-              });
-            }}
-            onSave={() => {
-              setSavedIds(prev => {
-                const next = prev.includes(selectedWallpaper.id)
-                  ? prev.filter(i => i !== selectedWallpaper.id)
-                  : [...prev, selectedWallpaper.id];
-                localStorage.setItem('aura_saved_ids', JSON.stringify(next));
-                return next;
-              });
-            }}
-            onBack={() => setSelectedWallpaper(null)}
-          />
+          <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />}>
+            <Detail
+              wallpaper={selectedWallpaper}
+              isLiked={likedIds.includes(selectedWallpaper.id)}
+              isSaved={savedIds.includes(selectedWallpaper.id)}
+              currentUser={currentUser}
+              onClose={() => setSelectedWallpaper(null)}
+              onLike={() => {
+                setLikedIds(prev => {
+                  const next = prev.includes(selectedWallpaper.id)
+                    ? prev.filter(i => i !== selectedWallpaper.id)
+                    : [...prev, selectedWallpaper.id];
+                  localStorage.setItem('aura_liked_ids', JSON.stringify(next));
+                  return next;
+                });
+              }}
+              onSave={() => {
+                setSavedIds(prev => {
+                  const next = prev.includes(selectedWallpaper.id)
+                    ? prev.filter(i => i !== selectedWallpaper.id)
+                    : [...prev, selectedWallpaper.id];
+                  localStorage.setItem('aura_saved_ids', JSON.stringify(next));
+                  return next;
+                });
+              }}
+              onBack={() => setSelectedWallpaper(null)}
+            />
+          </Suspense>
         )}
 
         {isSearchOpen && (
-          <SearchOverlay
-            wallpapers={wallpapers}
-            onSelect={(wp) => { setSelectedWallpaper(wp); setIsSearchOpen(false); }}
-            onClose={() => setIsSearchOpen(false)}
-          />
+          <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />}>
+            <SearchOverlay
+              wallpapers={wallpapers}
+              onSelect={(wp) => { setSelectedWallpaper(wp); setIsSearchOpen(false); }}
+              onClose={() => setIsSearchOpen(false)}
+            />
+          </Suspense>
         )}
 
-        {showAuth && <Auth onSuccess={setCurrentUser} onClose={() => setShowAuth(false)} onBack={() => setShowAuth(false)} />}
+        {showAuth && (
+          <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />}>
+            <Auth onSuccess={setCurrentUser} onClose={() => setShowAuth(false)} onBack={() => setShowAuth(false)} />
+          </Suspense>
+        )}
       </AnimatePresence>
 
       {showInstallBanner && <PWAInstallBanner deferredPrompt={deferredPrompt} onClose={() => setShowInstallBanner(false)} />}
