@@ -276,7 +276,7 @@ const App: React.FC = () => {
                   const next = prev.includes(selectedWallpaper.id)
                     ? prev.filter(i => i !== selectedWallpaper.id)
                     : [...prev, selectedWallpaper.id];
-                  localStorage.setItem('aura_saved_ids', JSON.stringify(next));
+                  localStorage.setItem('aura_liked_ids', JSON.stringify(next));
                   return next;
                 });
               }}
