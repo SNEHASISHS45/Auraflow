@@ -98,23 +98,16 @@ export const dbService = {
 
   async getNotifications(userId: string): Promise<any[]> {
     try {
-      // Remove orderBy from the query to avoid needing a composite index
       const q = query(
         collection(db, 'notifications'),
-        where("userId", "==", userId)
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc")
       );
       const querySnapshot = await getDocs(q);
-      const items = querySnapshot.docs.map(doc => ({
+      return querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-
-      // Sort in memory instead
-      return items.sort((a: any, b: any) => {
-        const dateA = a.createdAt?.seconds || 0;
-        const dateB = b.createdAt?.seconds || 0;
-        return dateB - dateA;
-      });
     } catch (error) {
       console.error("Error getting notifications:", error);
       return [];
