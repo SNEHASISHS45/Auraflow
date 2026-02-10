@@ -5,8 +5,14 @@
  */
 
 // CORS proxy to bypass browser restrictions
+const isBrowser = typeof window !== 'undefined';
 const CORS_PROXY = 'https://corsproxy.io/?';
 const BASE_URL = 'https://wallhaven.cc/api/v1';
+
+// Cache configuration
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_SIZE = 100;
+const searchCache = new Map<string, { timestamp: number; data: WallhavenItem[] }>();
 
 // Optional: Add your Wallhaven API key for NSFW content (leave empty for SFW only)
 const API_KEY = '';
@@ -105,6 +111,13 @@ export const wallhavenService = {
         categories: string = '111', // 111 = all categories enabled
         purity: string = '100' // 100 = SFW only
     ): Promise<WallhavenItem[]> {
+        const cacheKey = `search:${query}:${page}:${categories}:${purity}`;
+        const cached = searchCache.get(cacheKey);
+
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            return cached.data;
+        }
+
         try {
             const params = new URLSearchParams({
                 q: query,
@@ -116,11 +129,20 @@ export const wallhavenService = {
                 ratios: 'portrait' // Phone wallpapers
             });
 
-            const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`${BASE_URL}/search?${params}`)}`);
+            const url = `${BASE_URL}/search?${params}`;
+            const fetchUrl = isBrowser ? `${CORS_PROXY}${encodeURIComponent(url)}` : url;
+            const response = await fetch(fetchUrl);
             if (!response.ok) throw new Error('Failed to search wallhaven');
 
             const data: WallhavenSearchResponse = await response.json();
-            return data.data.map(wallpaperToItem);
+            const results = data.data.map(wallpaperToItem);
+
+            if (searchCache.size >= MAX_CACHE_SIZE) {
+                searchCache.clear();
+            }
+            searchCache.set(cacheKey, { timestamp: Date.now(), data: results });
+
+            return results;
         } catch (error) {
             console.error('Wallhaven search error:', error);
             return [];
@@ -156,7 +178,9 @@ export const wallhavenService = {
                 ratios: 'portrait'
             });
 
-            const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`${BASE_URL}/search?${params}`)}`);
+            const url = `${BASE_URL}/search?${params}`;
+            const fetchUrl = isBrowser ? `${CORS_PROXY}${encodeURIComponent(url)}` : url;
+            const response = await fetch(fetchUrl);
             if (!response.ok) throw new Error('Failed to get popular');
 
             const data: WallhavenSearchResponse = await response.json();
@@ -181,7 +205,9 @@ export const wallhavenService = {
                 ratios: 'portrait'
             });
 
-            const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`${BASE_URL}/search?${params}`)}`);
+            const url = `${BASE_URL}/search?${params}`;
+            const fetchUrl = isBrowser ? `${CORS_PROXY}${encodeURIComponent(url)}` : url;
+            const response = await fetch(fetchUrl);
             if (!response.ok) throw new Error('Failed to get latest');
 
             const data: WallhavenSearchResponse = await response.json();
