@@ -55,7 +55,7 @@ export const dbService = {
         console.error("🔥 Firestore Permission Denied! Update your security rules in the Firebase console.");
       }
       console.error("Error getting wallpapers:", error);
-      return MOCK_WALLPAPERS; // Fallback to mocks
+      return []; // Return empty array on error instead of mocks
     }
   },
 
