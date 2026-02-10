@@ -63,6 +63,7 @@ export const dbService = {
 
   async getUserWallpapers(userId: string): Promise<Wallpaper[]> {
     try {
+      // Uses a composite index on [authorId, createdAt] for server-side sorting
       const q = query(
         collection(db, COLLECTION_NAME),
         where("authorId", "==", userId),
