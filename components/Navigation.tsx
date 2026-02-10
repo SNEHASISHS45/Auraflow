@@ -29,45 +29,43 @@ interface NavProps {
 
 export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, currentUser }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] pb-[env(safe-area-inset-bottom)] bg-black border-t border-white/5 lg:hidden">
-      <div className="flex items-center justify-around h-16 px-4">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] pb-[env(safe-area-inset-bottom)] bg-surface border-t border-outline/10 lg:hidden shadow-3">
+      <div className="flex items-center justify-around h-20 px-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
-
-          if (tab.id === AppTab.PROFILE && currentUser) {
-            return (
-              <button
-                key={tab.id}
-                onClick={() => { soundService.playTap(); setActiveTab(tab.id); }}
-                className={`relative flex flex-col items-center justify-center flex-1 h-full transition-all ${isActive ? 'text-primary dark:text-white' : 'text-black/20 dark:text-white/20'}`}
-              >
-                <div className={`size-6 rounded-full bg-cover bg-center border border-white/10 ${isActive ? 'ring-2 ring-white' : ''}`} style={{ backgroundImage: `url(${currentUser.avatar})` }} />
-                <span className="text-[8px] font-black uppercase tracking-tight mt-1">
-                  {tab.label}
-                </span>
-              </button>
-            );
-          }
 
           return (
             <button
               key={tab.id}
               onClick={() => { soundService.playTap(); setActiveTab(tab.id); }}
-              className={`relative flex flex-col items-center justify-center flex-1 h-full transition-all ${isActive ? 'text-primary dark:text-white' : 'text-black/20 dark:text-white/20'}`}
+              className={`relative flex flex-col items-center justify-center flex-1 h-full transition-all group`}
             >
-              <AnimatePresence>
-                {isActive && (
-                  <motion.div
-                    layoutId="nav-pill"
-                    className="absolute inset-x-2 inset-y-2 bg-black/5 dark:bg-white/5 rounded-2xl -z-10"
-                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+              <div className="relative flex flex-col items-center">
+                <AnimatePresence>
+                  {isActive && (
+                    <motion.div
+                      layoutId="nav-pill"
+                      className="absolute inset-x-[-12px] h-8 bg-primary-container rounded-full -z-10 top-[-4px]"
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                    />
+                  )}
+                </AnimatePresence>
+
+                {tab.id === AppTab.PROFILE && currentUser ? (
+                  <div
+                    className={`size-6 rounded-full bg-cover bg-center border border-outline/20 transition-all ${isActive ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface' : 'group-hover:scale-110'}`}
+                    style={{ backgroundImage: `url(${currentUser.avatar})` }}
                   />
+                ) : (
+                  <AnimateIcon animation={isActive ? 'default' : 'initial'}>
+                    <tab.icon
+                      size={24}
+                      className={`transition-colors ${isActive ? 'text-on-primary-container fill-current' : 'text-on-surface-variant group-hover:text-on-surface'}`}
+                    />
+                  </AnimateIcon>
                 )}
-              </AnimatePresence>
-              <AnimateIcon animation={isActive ? 'default' : 'initial'}>
-                <tab.icon size={24} className={isActive ? 'fill-current' : ''} />
-              </AnimateIcon>
-              <span className="text-[8px] font-black uppercase tracking-tight mt-1">
+              </div>
+              <span className={`text-[10px] font-bold uppercase tracking-tight mt-2 transition-colors ${isActive ? 'text-primary' : 'text-on-surface-variant'}`}>
                 {tab.label}
               </span>
             </button>
@@ -78,45 +76,52 @@ export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, current
   );
 };
 
-export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, isDarkMode, onToggleTheme, onNotificationOpen }) => {
+export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, onNotificationOpen }) => {
   return (
-    <aside className="hidden lg:flex flex-col w-72 h-screen border-r border-white/5 bg-black p-12 z-[110]">
-      <div className="mb-24">
-        <h1 className="text-2xl font-black tracking-tighter uppercase text-white">AuraFlow</h1>
+    <aside className="hidden lg:flex flex-col w-72 h-screen border-r border-outline/10 bg-surface p-8 z-[110]">
+      <div className="mb-16 px-4">
+        <h1 className="text-3xl font-black tracking-tighter uppercase text-primary">AuraFlow</h1>
       </div>
 
-      <nav className="flex-1 space-y-8">
+      <nav className="flex-1 space-y-4">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => { soundService.playTap(); setActiveTab(tab.id); }}
-              className={`w-full flex items-center gap-5 transition-all group ${isActive ? 'text-primary dark:text-white' : 'text-black/30 dark:text-white/30 hover:text-primary dark:hover:text-white'}`}
+              className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-full transition-all group relative ${isActive ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface'}`}
             >
               <AnimateIcon animation={isActive ? 'default' : 'initial'}>
                 <tab.icon size={22} className={`transition-transform group-hover:scale-110 ${isActive ? 'fill-current' : ''}`} />
               </AnimateIcon>
-              <span className={`text-[12px] font-black uppercase tracking-[0.2em] ${isActive ? '' : ''}`}>
+              <span className="text-sm font-bold tracking-wide uppercase">
                 {tab.label}
               </span>
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-pill"
+                  className="absolute inset-0 bg-secondary-container rounded-full -z-10"
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                />
+              )}
             </button>
           );
         })}
       </nav>
 
-      <div className="pt-12 border-t border-black/5 dark:border-white/5 space-y-8">
+      <div className="pt-8 border-t border-outline/10 space-y-4">
         <button
           onClick={() => { soundService.playTick(); onNotificationOpen?.(); }}
-          className="flex items-center gap-5 text-black/30 dark:text-white/30 hover:text-primary dark:hover:text-white transition-all group"
+          className="w-full flex items-center gap-4 px-5 py-3.5 rounded-full text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface transition-all group"
         >
           <div className="relative">
             <AnimateIcon animation="path">
               <BellIcon size={22} className="group-hover:scale-110 transition-transform" />
             </AnimateIcon>
-            <div className="absolute -top-1 -right-1 size-2 bg-accent rounded-full border-2 border-white dark:border-background-dark" />
+            <div className="absolute -top-1 -right-1 size-2 bg-primary rounded-full border-2 border-surface" />
           </div>
-          <span className="text-[12px] font-black uppercase tracking-[0.2em]">
+          <span className="text-sm font-bold tracking-wide uppercase">
             Notifications
           </span>
         </button>
@@ -147,32 +152,36 @@ export const TopBar: React.FC<NavProps & { title: string; hideOnDesktop?: boolea
 
   return (
     <header
-      className={`sticky top-0 z-[90] px-6 h-16 flex items-center justify-between lg:hidden transition-all duration-300 ${isScrolled
-        ? 'bg-black border-b border-white/5'
+      className={`sticky top-0 z-[90] px-4 h-16 flex items-center justify-between transition-all duration-300 ${isScrolled
+        ? 'bg-surface/90 backdrop-blur-md border-b border-outline/10'
         : 'bg-transparent'
         }`}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex-1 flex items-center">
         {canGoBack ? (
-          <button onClick={onBack} className="flex items-center gap-2">
+          <button onClick={onBack} className="p-2 rounded-full hover:bg-surface-variant/50 transition-colors">
             <AnimateIcon animation="default">
-              <ArrowLeftIcon size={24} />
+              <ArrowLeftIcon size={24} className="text-on-surface" />
             </AnimateIcon>
           </button>
         ) : (
-          <AnimateIcon animation="default">
-            <SparklesIcon size={24} className="text-accent" />
-          </AnimateIcon>
+          <div className="p-2">
+            <AnimateIcon animation="default">
+              <SparklesIcon size={24} className="text-primary" />
+            </AnimateIcon>
+          </div>
         )}
-        <h2 className="text-[12px] font-black uppercase tracking-[0.2em]">{title}</h2>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Search Button */}
+      <div className="absolute left-1/2 -translate-x-1/2 text-center overflow-hidden max-w-[50%]">
+        <h2 className="text-sm font-black uppercase tracking-[0.3em] text-on-surface truncate">{title}</h2>
+      </div>
+
+      <div className="flex-1 flex items-center justify-end gap-1">
         {onSearchClick && (
           <button
             onClick={() => { soundService.playTick(); onSearchClick(); }}
-            className="size-10 rounded-full flex items-center justify-center text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70 transition-colors"
+            className="size-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/80 transition-colors"
           >
             <AnimateIcon animation="path">
               <SearchIcon size={20} />
@@ -180,15 +189,14 @@ export const TopBar: React.FC<NavProps & { title: string; hideOnDesktop?: boolea
           </button>
         )}
 
-        {/* Notification Button */}
         <button
           onClick={() => { soundService.playTick(); onNotificationOpen?.(); }}
-          className="size-10 rounded-full flex items-center justify-center text-black/40 dark:text-white/40 relative"
+          className="size-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/80 relative transition-colors"
         >
           <AnimateIcon animation="default">
             <BellIcon size={22} />
           </AnimateIcon>
-          <div className="absolute top-2 right-2 size-2 bg-accent rounded-full border-2 border-white dark:border-background-dark" />
+          <div className="absolute top-2.5 right-2.5 size-2 bg-primary rounded-full border-2 border-surface" />
         </button>
       </div>
     </header>

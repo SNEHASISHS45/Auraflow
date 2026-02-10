@@ -429,6 +429,31 @@ export const ArrowRightIcon: React.FC<IconProps> = ({ animation, className = "",
     );
 };
 
+export const LensIcon: React.FC<IconProps> = ({ animation, className = "", size = 24 }) => {
+    const scanVariants = {
+        ...pathVariants,
+        default: { y: 0 },
+        hover: { y: [0, -3, 3, 0], transition: { duration: 0.6, repeat: Infinity } }
+    };
+    return (
+        <svg
+            width={size} height={size} viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className={className}
+        >
+            {/* Viewfinder corners */}
+            <motion.path d="M2 7V2h5" variants={pathVariants} initial="initial" animate={animation} />
+            <motion.path d="M22 7V2h-5" variants={pathVariants} initial="initial" animate={animation} />
+            <motion.path d="M2 17v5h5" variants={pathVariants} initial="initial" animate={animation} />
+            <motion.path d="M22 17v5h-5" variants={pathVariants} initial="initial" animate={animation} />
+            {/* Scan line */}
+            <motion.line x1="5" y1="12" x2="19" y2="12" variants={scanVariants} initial="initial" animate={animation} />
+            {/* Center dot */}
+            <motion.circle cx="12" cy="12" r="2" variants={pathVariants} initial="initial" animate={animation} />
+        </svg>
+    );
+};
+
 export const GridIcon: React.FC<IconProps> = HomeIcon;
 export const DiscoverIcon: React.FC<IconProps> = SearchIcon;
 export const CreateIcon: React.FC<IconProps> = PlusIcon;

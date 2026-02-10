@@ -1,16 +1,42 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #000000;
-  --color-accent: #2b6cee;
-  --color-background-dark: #000000;
-  --color-background-light: #000000;
+  /* M3 Seed Color: #D0BCFF (Primary Purple) */
+  --color-primary: #D0BCFF;
+  --color-on-primary: #381E72;
+  --color-primary-container: #4F378B;
+  --color-on-primary-container: #EADDFF;
+  
+  --color-secondary: #CCC2DC;
+  --color-on-secondary: #332D41;
+  --color-secondary-container: #4A4458;
+  --color-on-secondary-container: #E8DEF8;
+
+  --color-tertiary: #EFB8C8;
+  --color-on-tertiary: #492532;
+  --color-tertiary-container: #633B48;
+  --color-on-tertiary-container: #FFD8E4;
+
+  --color-surface: #1C1B1F;
+  --color-on-surface: #E6E1E5;
+  --color-surface-variant: #49454F;
+  --color-on-surface-variant: #CAC4D0;
+  --color-outline: #938F99;
+
+  --color-accent: #D0BCFF;
+  --color-background-dark: #1C1B1F;
+  --color-background-light: #FDFBFF;
   --color-surface-dark: rgba(255, 255, 255, 0.05);
   --color-surface-light: rgba(0, 0, 0, 0.03);
 
   --font-display: "Plus Jakarta Sans", sans-serif;
   --font-mono: "Space Grotesk", monospace;
 
+  /* M3 Elevation */
+  --shadow-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.15), 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+  --shadow-3: 0px 1px 3px 0px rgba(0, 0, 0, 0.3), 0px 4px 8px 3px rgba(0, 0, 0, 0.15);
+  
   --animate-slide-in: slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-shimmer: shimmer 2s infinite linear;
 

@@ -26,6 +26,15 @@ export interface Wallpaper {
   createdAt?: any;
   visibility?: 'public' | 'private';
   videoUrl?: string;
+  // AI cache fields — saved to Firestore to avoid repeat API calls
+  aiInsight?: string;
+  aiDescription?: string;
+  aiColors?: { name: string; hex: string }[];
+  aiMood?: string;
+  aiCategory?: string;
+  aiObjects?: string[];
+  aiStyle?: string;
+  aiSearchTerms?: string[];
 }
 
 export interface Collection {

@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from './services/dbService';
 import { authService } from './services/authService';
 import { soundService } from './services/soundService';
+import { PullToRefresh } from './components/ui/PullToRefresh';
 
 // Lazy load heavy components
 const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
@@ -18,6 +19,7 @@ const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: 
 const Saved = lazy(() => import('./pages/Saved').then(module => ({ default: module.Saved })));
 const Detail = lazy(() => import('./pages/Detail').then(module => ({ default: module.Detail })));
 const Auth = lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
+const Lens = lazy(() => import('./pages/Lens').then(module => ({ default: module.Lens })));
 const SearchOverlay = lazy(() => import('./components/SearchOverlay').then(module => ({ default: module.SearchOverlay })));
 
 const OverlayFallback = () => (
@@ -143,7 +145,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background dark:bg-background-dark text-white flex flex-row lg:overflow-hidden font-display">
+    <div className="min-h-screen bg-surface text-on-surface flex flex-row lg:overflow-hidden font-display selection:bg-primary/30">
       {isDesktop && (
         <Sidebar
           activeTab={activeTab}
@@ -165,97 +167,112 @@ const App: React.FC = () => {
         />
 
         <main className="flex-1 overflow-y-auto no-scrollbar relative">
-          <AnimatePresence mode="wait">
-            <Suspense fallback={<ProfileSkeleton />}>
-              <Routes location={location} key={location.pathname}>
-                <Route path="/" element={
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                    className="h-full"
-                  >
-                    <Home
-                      onSelect={setSelectedWallpaper}
-                      likedIds={likedIds}
-                      onLike={handleLike}
-                      customWallpapers={wallpapers}
-                    />
-                  </motion.div>
-                } />
-                <Route path="/explore" element={
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="h-full"
-                  >
-                    <Explore onSelect={setSelectedWallpaper} />
-                  </motion.div>
-                } />
-                <Route path="/upload" element={
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="h-full"
-                  >
-                    <Upload onUploadSuccess={async (wp) => {
-                      if (currentUser) {
-                        const wallpaperData = {
-                          ...wp,
-                          author: currentUser.name,
-                          authorAvatar: currentUser.avatar,
-                          authorId: currentUser.id
-                        };
-                        await dbService.saveWallpaper(wallpaperData);
-                        navigate('/');
-                        refreshWallpapers();
-                      }
-                    }} currentUser={currentUser} onAuthRequired={() => setShowAuth(true)} />
-                  </motion.div>
-                } />
-                <Route path="/saved" element={
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="h-full"
-                  >
-                    <Saved onSelect={setSelectedWallpaper} savedIds={savedIds} wallpapers={wallpapers} />
-                  </motion.div>
-                } />
-                <Route path="/profile" element={
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                    className="h-full"
-                  >
-                    <Profile
-                      currentUser={currentUser}
-                      onUserUpdate={(updatedUser) => {
-                        setCurrentUser(updatedUser);
-                      }}
-                      onSignInClick={() => setShowAuth(true)}
-                      onSignOut={async () => {
-                        await authService.signOut();
-                        setCurrentUser(null);
-                        soundService.playSuccess();
-                      }}
-                      onRefresh={refreshWallpapers}
-                    />
-                  </motion.div>
-                } />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </AnimatePresence>
+          <PullToRefresh onRefresh={refreshWallpapers}>
+            <AnimatePresence mode="wait">
+              <Suspense fallback={<ProfileSkeleton />}>
+                <motion.div key={location.pathname}>
+                  <Routes location={location}>
+                    <Route path="/" element={
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className="min-h-full"
+                      >
+                        <Home
+                          onSelect={setSelectedWallpaper}
+                          likedIds={likedIds}
+                          onLike={handleLike}
+                          customWallpapers={wallpapers}
+                        />
+                      </motion.div>
+                    } />
+                    <Route path="/explore" element={
+                      <motion.div
+                        initial={{ opacity: 0, x: 30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -30 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className="min-h-full"
+                      >
+                        <Explore onSelect={setSelectedWallpaper} />
+                      </motion.div>
+                    } />
+                    <Route path="/upload" element={
+                      <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -30 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                        className="min-h-full"
+                      >
+                        <Upload onUploadSuccess={async (wp) => {
+                          if (currentUser) {
+                            const wallpaperData = {
+                              ...wp,
+                              author: currentUser.name,
+                              authorAvatar: currentUser.avatar,
+                              authorId: currentUser.id
+                            };
+                            await dbService.saveWallpaper(wallpaperData);
+                            navigate('/');
+                            refreshWallpapers();
+                          }
+                        }} currentUser={currentUser} onAuthRequired={() => setShowAuth(true)} />
+                      </motion.div>
+                    } />
+                    <Route path="/lens" element={
+                      <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -30 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+                        className="min-h-full"
+                      >
+                        <Lens onSelect={setSelectedWallpaper} />
+                      </motion.div>
+                    } />
+                    <Route path="/saved" element={
+                      <motion.div
+                        initial={{ opacity: 0, x: 30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -30 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className="min-h-full"
+                      >
+                        <Saved onSelect={setSelectedWallpaper} savedIds={savedIds} wallpapers={wallpapers} />
+                      </motion.div>
+                    } />
+                    <Route path="/profile" element={
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        className="min-h-full"
+                      >
+                        <Profile
+                          currentUser={currentUser}
+                          onUserUpdate={(updatedUser) => {
+                            setCurrentUser(updatedUser);
+                          }}
+                          onSignInClick={() => setShowAuth(true)}
+                          onSignOut={async () => {
+                            await authService.signOut();
+                            setCurrentUser(null);
+                            soundService.playSuccess();
+                          }}
+                          onRefresh={refreshWallpapers}
+                        />
+                      </motion.div>
+                    } />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </motion.div>
+              </Suspense>
+            </AnimatePresence>
+          </PullToRefresh>
         </main>
 
         {!isDesktop && <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} currentUser={currentUser} />}
@@ -309,7 +326,7 @@ const App: React.FC = () => {
         onClose={() => setIsNotificationOpen(false)}
         currentUser={currentUser}
       />
-    </div>
+    </div >
   );
 };
 

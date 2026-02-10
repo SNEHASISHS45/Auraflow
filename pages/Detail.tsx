@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Wallpaper, User, AppComment } from '../types';
 import { soundService } from '../services/soundService';
-import { geminiService } from '../services/geminiService';
+import { LensResult } from '../services/geminiService';
+import { aiCacheService } from '../services/aiCacheService';
 import { downloadService } from '../services/downloadService';
 import { dbService } from '../services/dbService';
 import { Skeleton } from '../components/Skeleton';
@@ -20,9 +21,11 @@ import {
   Play,
   Pause,
   Volume2,
-  VolumeX
+  VolumeX,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
-import { SparklesIcon } from '../components/ui/Icons';
+import { SparklesIcon, LensIcon } from '../components/ui/Icons';
 
 interface DetailProps {
   wallpaper: Wallpaper;
@@ -44,6 +47,11 @@ export const Detail: React.FC<DetailProps> = ({
   const [newComment, setNewComment] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
+  // AI Lens state
+  const [lensOpen, setLensOpen] = useState(false);
+  const [lensResult, setLensResult] = useState<LensResult | null>(null);
+  const [lensLoading, setLensLoading] = useState(false);
+
   // Video state
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -51,41 +59,45 @@ export const Detail: React.FC<DetailProps> = ({
 
   const isVideo = wallpaper.type === 'live' && wallpaper.videoUrl;
 
-  // Auto-play video when component mounts
   useEffect(() => {
     if (isVideo && videoRef.current) {
-      videoRef.current.play().catch(() => {
-        // Autoplay blocked, user needs to interact
-        setIsPlaying(false);
-      });
+      videoRef.current.play().catch(() => setIsPlaying(false));
     }
   }, [isVideo]);
 
   useEffect(() => {
-    // 1. Fetch AI Insight
-    geminiService.getWallpaperInsight(wallpaper.title, wallpaper.tags)
+    // Use cached insight (localStorage → Firestore → API)
+    aiCacheService.getInsight(wallpaper)
       .then(res => setAiInsight(res))
       .catch(() => setAiInsight("Artistic masterpiece."))
       .finally(() => setLoadingInsight(false));
-
-
-    // Firestore calls disabled - deploy rules to Firebase Console to re-enable
-    // const isFirestoreWallpaper = !wallpaper.id.startsWith('pexels-');
-    // if (isFirestoreWallpaper) {
-    //   dbService.getComments(wallpaper.id).then(setComments).catch(() => {});
-    //   dbService.incrementStats(wallpaper.id, 'views').catch(() => {});
-    // }
   }, [wallpaper]);
+
+  const handleLensAnalysis = async () => {
+    if (lensResult) {
+      setLensOpen(!lensOpen);
+      return;
+    }
+    setLensOpen(true);
+    setLensLoading(true);
+    soundService.playTap();
+    try {
+      // Use cached lens analysis (localStorage → Firestore → API)
+      const result = await aiCacheService.getLensAnalysis(wallpaper);
+      setLensResult(result);
+      soundService.playSuccess();
+    } catch (error) {
+      console.error('Lens analysis failed:', error);
+    } finally {
+      setLensLoading(false);
+    }
+  };
 
   const handleDownload = async () => {
     setIsDownloading(true);
     soundService.playTap();
     try {
       await downloadService.downloadImage(wallpaper.url, wallpaper.title);
-      // Stats disabled - uncomment after deploying Firebase rules
-      // if (!wallpaper.id.startsWith('pexels-')) {
-      //   dbService.incrementStats(wallpaper.id, 'downloads').catch(() => {});
-      // }
     } catch (e) { }
     setIsDownloading(false);
   };
@@ -106,14 +118,10 @@ export const Detail: React.FC<DetailProps> = ({
     } catch (err) { }
   };
 
-  // Video controls
   const togglePlayPause = () => {
     if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
+      if (isPlaying) videoRef.current.pause();
+      else videoRef.current.play();
       setIsPlaying(!isPlaying);
     }
   };
@@ -129,17 +137,14 @@ export const Detail: React.FC<DetailProps> = ({
     if (!newComment.trim() || !currentUser || isPosting) return;
     setIsPosting(true);
     soundService.playTap();
-
     try {
-      const commentData = {
+      await dbService.addComment({
         wallpaperId: wallpaper.id,
         userId: currentUser.id,
         userName: currentUser.name,
         userAvatar: currentUser.avatar,
         content: newComment.trim(),
-      };
-
-      await dbService.addComment(commentData);
+      });
       setNewComment('');
       const updated = await dbService.getComments(wallpaper.id);
       setComments(updated);
@@ -153,30 +158,25 @@ export const Detail: React.FC<DetailProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] bg-white dark:bg-black overflow-y-auto no-scrollbar"
+      initial={{ opacity: 0, scale: 0.95, y: 100 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 1.05, y: 50 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+      className="fixed inset-0 z-[1000] bg-surface overflow-y-auto no-scrollbar"
     >
-      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 lg:py-12 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-8 min-h-screen">
 
         {/* Navigation */}
-        <header className="flex items-center justify-between mb-8 sticky top-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md py-4 -mx-4 px-4 lg:-mx-8 lg:px-8">
-          <button
-            onClick={onBack}
-            className="p-3 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-          >
-            <ArrowLeft size={24} />
+        <header className="flex items-center justify-between mb-8 sticky top-0 z-50 bg-surface/80 backdrop-blur-md py-4 -mx-4 px-4 lg:-mx-8 lg:px-8 border-b border-outline/10">
+          <button onClick={onBack} className="p-3 rounded-full hover:bg-surface-variant/50 transition-colors">
+            <ArrowLeft size={24} className="text-on-surface" />
           </button>
           <div className="flex gap-2">
-            <button
-              onClick={handleShare}
-              className="p-3 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-            >
-              <Share2 size={24} />
+            <button onClick={handleShare} className="p-3 rounded-full hover:bg-surface-variant/50 transition-colors">
+              <Share2 size={24} className="text-on-surface" />
             </button>
-            <button className="p-3 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-              <MoreHorizontal size={24} />
+            <button className="p-3 rounded-full hover:bg-surface-variant/50 transition-colors">
+              <MoreHorizontal size={24} className="text-on-surface" />
             </button>
           </div>
         </header>
@@ -193,71 +193,42 @@ export const Detail: React.FC<DetailProps> = ({
                     src={wallpaper.videoUrl}
                     poster={wallpaper.url}
                     className="w-full h-full object-cover"
-                    autoPlay
-                    loop
-                    muted={isMuted}
-                    playsInline
+                    autoPlay loop muted={isMuted} playsInline
                   />
-                  {/* Video Controls */}
                   <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                    <button
-                      onClick={togglePlayPause}
-                      className="size-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
-                    >
+                    <button onClick={togglePlayPause} className="size-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors">
                       {isPlaying ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
                     </button>
-                    <button
-                      onClick={toggleMute}
-                      className="size-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
-                    >
+                    <button onClick={toggleMute} className="size-12 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors">
                       {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                     </button>
                   </div>
-                  {/* Video badge */}
                   <div className="absolute top-4 right-4 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-full text-xs font-medium text-white flex items-center gap-1.5">
                     <Play size={12} className="fill-white" />
                     Live Wallpaper
                   </div>
                 </>
               ) : (
-                <img
-                  src={wallpaper.url}
-                  className="w-full h-full object-cover"
-                  alt={wallpaper.title}
-                />
+                <img src={wallpaper.url} className="w-full h-full object-cover" alt={wallpaper.title} />
               )}
             </div>
 
-            {/* Desktop Only Actions - Below Image */}
+            {/* Desktop Only Actions */}
             <div className="hidden lg:flex items-center justify-between mt-8 gap-4">
               <div className="flex gap-4">
-                <button
-                  onClick={onToggleLike}
-                  className={`h-12 w-12 flex items-center justify-center rounded-full border transition-all ${isLiked ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-500' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'}`}
-                >
+                <button onClick={onToggleLike} className={`h-12 w-12 flex items-center justify-center rounded-full border transition-all ${isLiked ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-500' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'}`}>
                   <AnimateIcon animation={isLiked ? 'default' : 'initial'}>
                     <Heart size={24} className={isLiked ? 'fill-current' : ''} />
                   </AnimateIcon>
                 </button>
-                <button
-                  onClick={onToggleSave}
-                  className={`h-12 w-12 flex items-center justify-center rounded-full border transition-all ${isSaved ? 'border-accent bg-blue-50 dark:bg-blue-900/20 text-accent' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'}`}
-                >
+                <button onClick={onToggleSave} className={`h-12 w-12 flex items-center justify-center rounded-full border transition-all ${isSaved ? 'border-accent bg-blue-50 dark:bg-blue-900/20 text-accent' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'}`}>
                   <AnimateIcon animation={isSaved ? 'default' : 'initial'}>
                     <Bookmark size={24} className={isSaved ? 'fill-current' : ''} />
                   </AnimateIcon>
                 </button>
               </div>
-              <button
-                onClick={handleDownload}
-                disabled={isDownloading}
-                className="flex-1 h-12 bg-black dark:bg-white text-white dark:text-black rounded-full font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-[0.98]"
-              >
-                {isDownloading ? (
-                  <RefreshCw size={18} className="animate-spin" />
-                ) : (
-                  <Download size={18} />
-                )}
+              <button onClick={handleDownload} disabled={isDownloading} className="flex-1 h-12 bg-black dark:bg-white text-white dark:text-black rounded-full font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-[0.98]">
+                {isDownloading ? <RefreshCw size={18} className="animate-spin" /> : <Download size={18} />}
                 {isDownloading ? 'Downloading...' : 'Download Wallpaper'}
               </button>
             </div>
@@ -268,31 +239,31 @@ export const Detail: React.FC<DetailProps> = ({
 
             {/* Title & Author */}
             <div className="space-y-4">
-              <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-gray-900 dark:text-white leading-tight">
+              <h1 className="text-4xl lg:text-5xl font-black tracking-tight text-on-surface leading-tight">
                 {wallpaper.title}
               </h1>
               <div className="flex items-center gap-4">
-                <img src={wallpaper.authorAvatar} className="size-10 rounded-full bg-gray-200" alt="" />
+                <img src={wallpaper.authorAvatar} className="size-11 rounded-full bg-surface-variant" alt="" />
                 <div>
-                  <p className="font-medium text-gray-900 dark:text-white">{wallpaper.author}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">@auraflow_creator</p>
+                  <p className="font-bold text-on-surface">{wallpaper.author}</p>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-on-surface-variant">@auraflow_creator</p>
                 </div>
               </div>
             </div>
 
             {/* Stats Row */}
-            <div className="flex items-center gap-8 py-6 border-y border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-8 py-8 border-y border-outline/10">
               <div className="flex flex-col gap-1">
-                <span className="text-xl font-bold font-mono">{wallpaper.views || 0}</span>
-                <span className="text-xs text-gray-500 uppercase tracking-wider">Views</span>
+                <span className="text-2xl font-black font-mono text-primary">{wallpaper.views || 0}</span>
+                <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-[0.2em]">Views</span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xl font-bold font-mono">{wallpaper.downloads || 0}</span>
-                <span className="text-xs text-gray-500 uppercase tracking-wider">Downloads</span>
+                <span className="text-2xl font-black font-mono text-primary">{wallpaper.downloads || 0}</span>
+                <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-[0.2em]">Downloads</span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xl font-bold font-mono">{wallpaper.likes || 0}</span>
-                <span className="text-xs text-gray-500 uppercase tracking-wider">Likes</span>
+                <span className="text-2xl font-black font-mono text-primary">{wallpaper.likes || 0}</span>
+                <span className="text-[9px] text-on-surface-variant font-bold uppercase tracking-[0.2em]">Likes</span>
               </div>
             </div>
 
@@ -314,10 +285,122 @@ export const Detail: React.FC<DetailProps> = ({
               )}
             </div>
 
+            {/* ── AI Lens Panel ── */}
+            <div className="space-y-4">
+              <button
+                onClick={handleLensAnalysis}
+                className="w-full flex items-center justify-between p-5 rounded-2xl bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 border border-primary/20 hover:border-primary/40 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-xl bg-primary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <LensIcon size={20} className="text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-sm font-bold text-on-surface block">AI Lens Analysis</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      {lensResult ? 'Powered by Gemini Vision' : 'Tap to analyze with Gemini'}
+                    </span>
+                  </div>
+                </div>
+                {lensLoading ? (
+                  <RefreshCw size={16} className="text-primary animate-spin" />
+                ) : (
+                  lensOpen ? <ChevronUp size={16} className="text-on-surface-variant" /> : <ChevronDown size={16} className="text-on-surface-variant" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {lensOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden"
+                  >
+                    {lensLoading ? (
+                      <div className="p-6 rounded-2xl bg-surface-variant/20 border border-outline/10 space-y-4">
+                        <Skeleton className="h-4 w-full rounded" />
+                        <Skeleton className="h-4 w-5/6 rounded" />
+                        <Skeleton className="h-4 w-3/4 rounded" />
+                        <div className="flex gap-2 mt-4">
+                          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-20 rounded-full" />)}
+                        </div>
+                      </div>
+                    ) : lensResult ? (
+                      <div className="p-6 rounded-2xl bg-surface-variant/20 border border-outline/10 space-y-6">
+                        {/* Description */}
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-accent mb-2 block">Description</span>
+                          <p className="text-sm text-on-surface/80 leading-relaxed italic">"{lensResult.description}"</p>
+                        </div>
+
+                        {/* Style */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant">Style:</span>
+                          <span className="px-3 py-1 rounded-full bg-accent/10 text-[10px] font-bold text-accent border border-accent/20">{lensResult.style}</span>
+                        </div>
+
+                        {/* Color Palette */}
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-3 block">Color Palette</span>
+                          <div className="flex gap-3 flex-wrap">
+                            {lensResult.colors.map((c, i) => (
+                              <motion.div
+                                key={i}
+                                initial={{ opacity: 0, scale: 0 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: i * 0.1 }}
+                                className="flex flex-col items-center gap-1.5"
+                              >
+                                <div className="size-10 rounded-xl ring-2 ring-black/10 dark:ring-white/10 shadow-sm" style={{ backgroundColor: c.hex }} />
+                                <span className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant">{c.name}</span>
+                                <span className="text-[8px] font-mono text-on-surface-variant/60">{c.hex}</span>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Objects */}
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2 block">Identified Elements</span>
+                          <div className="flex flex-wrap gap-2">
+                            {lensResult.objects.map((obj, i) => (
+                              <motion.span
+                                key={i}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="px-3 py-1.5 rounded-full bg-primary/10 text-[9px] font-bold uppercase tracking-widest text-primary border border-primary/20"
+                              >
+                                {obj}
+                              </motion.span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Search Terms */}
+                        <div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2 block">Similar Search Terms</span>
+                          <div className="flex flex-wrap gap-2">
+                            {lensResult.searchTerms.map((term, i) => (
+                              <span key={i} className="px-3 py-1.5 rounded-full bg-secondary-container/30 text-[9px] font-bold uppercase tracking-widest text-on-secondary-container border border-outline/10">
+                                {term}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Tags */}
             <div className="flex flex-wrap gap-2">
               {wallpaper.tags.map(tag => (
-                <span key={tag} className="px-4 py-2 rounded-full bg-gray-100 dark:bg-white/5 text-sm font-medium text-gray-600 dark:text-gray-300">
+                <span key={tag} className="px-5 py-2.5 rounded-full bg-secondary-container/30 text-[10px] font-black uppercase tracking-widest text-on-secondary-container border border-outline/10">
                   {tag}
                 </span>
               ))}
@@ -327,7 +410,6 @@ export const Detail: React.FC<DetailProps> = ({
             <div className="space-y-6 pt-6">
               <h3 className="text-xl font-bold">Comments ({comments.length})</h3>
 
-              {/* Comment Input */}
               {currentUser ? (
                 <div className="flex gap-4">
                   <img src={currentUser.avatar} className="size-10 rounded-full" alt="" />
@@ -355,7 +437,6 @@ export const Detail: React.FC<DetailProps> = ({
                 </div>
               )}
 
-              {/* Comment List */}
               <div className="space-y-6">
                 {comments.map((comment) => (
                   <div key={comment.id} className="flex gap-4">
@@ -376,24 +457,24 @@ export const Detail: React.FC<DetailProps> = ({
         </div>
 
         {/* Mobile Sticky Action Bar */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-gray-100 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-lg lg:hidden flex gap-4 z-[900]">
+        <div className="fixed bottom-0 left-0 right-0 p-6 border-t border-outline/10 bg-surface/90 backdrop-blur-lg lg:hidden flex gap-4 z-[900]">
           <button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="flex-1 h-14 bg-black dark:bg-white text-white dark:text-black rounded-full font-bold text-sm flex items-center justify-center gap-2"
+            className="flex-1 h-16 bg-primary text-on-primary rounded-full font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-2 active:scale-95 transition-all"
           >
             {isDownloading ? <RefreshCw size={20} className="animate-spin" /> : <Download size={20} />}
             Download
           </button>
           <button
             onClick={onToggleLike}
-            className={`aspect-square h-14 rounded-full border flex items-center justify-center ${isLiked ? 'border-red-500 bg-red-50 text-red-500' : 'border-gray-200 dark:border-gray-700'}`}
+            className={`aspect-square h-16 rounded-full border flex items-center justify-center transition-all ${isLiked ? 'bg-primary-container text-on-primary-container border-transparent' : 'bg-surface text-on-surface border-outline/20'}`}
           >
             <Heart size={24} className={isLiked ? 'fill-current' : ''} />
           </button>
           <button
             onClick={onToggleSave}
-            className={`aspect-square h-14 rounded-full border flex items-center justify-center ${isSaved ? 'border-accent bg-blue-50 text-accent' : 'border-gray-200 dark:border-gray-700'}`}
+            className={`aspect-square h-16 rounded-full border flex items-center justify-center transition-all ${isSaved ? 'bg-secondary-container text-on-secondary-container border-transparent' : 'bg-surface text-on-surface border-outline/20'}`}
           >
             <Bookmark size={24} className={isSaved ? 'fill-current' : ''} />
           </button>

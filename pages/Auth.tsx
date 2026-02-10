@@ -72,25 +72,38 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
   };
 
   const containerVariants = {
-    hidden: { opacity: 0, y: 30 },
+    hidden: { opacity: 0, scale: 0.9, y: 100 },
     visible: {
       opacity: 1,
+      scale: 1,
       y: 0,
       transition: {
-        duration: 0.8,
-        ease: [0.16, 1, 0.3, 1],
-        staggerChildren: 0.1
+        type: 'spring',
+        stiffness: 300,
+        damping: 30,
+        staggerChildren: 0.08,
+        delayChildren: 0.2
       }
+    },
+    exit: {
+      opacity: 0,
+      scale: 1.1,
+      y: 50,
+      transition: { duration: 0.3, ease: 'easeInOut' }
     }
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: 'spring', stiffness: 350, damping: 35 }
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-[500] bg-black flex flex-col items-center justify-center overflow-hidden">
+    <div className="min-h-screen bg-surface text-on-surface flex flex-row lg:overflow-hidden font-display selection:bg-primary/30">
       {/* Immersive Background Slideshow */}
       <div className="absolute inset-0 z-0">
         <AnimatePresence mode="wait">
@@ -126,24 +139,18 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="w-full max-w-md px-8 relative z-10"
+        exit="exit"
+        className="w-full max-w-lg bg-surface-variant/20 backdrop-blur-2xl rounded-[40px] border border-outline/10 p-8 lg:p-12 shadow-3 relative overflow-hidden"
       >
-        <motion.div variants={itemVariants} className="text-center mb-10">
-          <motion.div
-            animate={{
-              rotate: [0, 10, -10, 0],
-              scale: [1, 1.05, 1]
-            }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-            className="size-20 bg-gradient-to-br from-primary to-accent rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-[0_0_50px_rgba(43,108,238,0.4)]"
-          >
-            <AnimateIcon animation="default">
-              <SparklesIcon size={40} className="text-white fill-current" />
-            </AnimateIcon>
-          </motion.div>
-          <h1 className="text-5xl font-black tracking-tighter mb-2 text-white">AuraFlow</h1>
-          <p className="text-white/60 text-xs font-bold uppercase tracking-[0.4em]">
-            {isLogin ? 'Enter the Aesthetic' : 'Create Your Identity'}
+        <motion.div variants={itemVariants} className="mb-10 text-center">
+          <div className="size-16 bg-primary/20 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-primary/20 shadow-1">
+            <SparklesIcon size={32} className="text-primary" />
+          </div>
+          <h2 className="text-4xl font-black tracking-tight text-on-surface mb-3 uppercase tracking-wider">
+            {isLogin ? 'Welcome Back' : 'Join Auraflow'}
+          </h2>
+          <p className="text-on-surface-variant font-medium tracking-wide italic">
+            {isLogin ? 'Continue your aesthetic journey' : 'Start your journey into high-end aesthetics'}
           </p>
         </motion.div>
 
@@ -210,17 +217,27 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary hover:bg-primary/90 text-white h-16 rounded-2xl font-black text-xs uppercase tracking-[0.25em] shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center justify-center"
+              className="w-full h-16 bg-primary-container text-on-primary-container rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-1 hover:shadow-2 active:scale-95 transition-all mb-8"
             >
               {loading ? (
                 <AnimateIcon animation="path">
                   <GridIcon size={24} className="animate-spin" />
                 </AnimateIcon>
               ) : (
-                isLogin ? 'Initialize Aura' : 'Begin Journey'
+                isLogin ? 'Sign In' : 'Create Account'
               )}
             </button>
           </form>
+
+          <p className="text-center text-on-surface-variant text-sm font-medium">
+            {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button
+              onClick={() => { setIsLogin(!isLogin); setError(''); soundService.playTick(); }}
+              className="text-primary font-black uppercase tracking-widest hover:underline decoration-2 underline-offset-4"
+            >
+              {isLogin ? 'Sign Up' : 'Sign In'}
+            </button>
+          </p>
 
           <motion.div variants={itemVariants} className="flex items-center gap-4 px-6">
             <div className="h-px flex-1 bg-white/10" />
@@ -234,22 +251,11 @@ export const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
           >
             {!loading && (
               <button
-                onClick={async () => {
-                  setError('');
-                  setLoading(true);
-                  soundService.playTap();
-                  try {
-                    const user = await authService.signInWithGoogle();
-                    onAuthSuccess(user);
-                  } catch (err: any) {
-                    setError(err.message || 'Google Sign-In failed');
-                    setLoading(false);
-                  }
-                }}
-                className="h-10 px-6 bg-white text-black hover:bg-slate-200 transition-colors rounded-full flex items-center gap-3 font-medium text-sm shadow-lg"
+                onClick={handleGoogleSignIn}
+                className="w-full h-16 bg-primary text-on-primary rounded-full font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-4 shadow-2 active:scale-95 transition-all mb-4"
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-                <span>Continue with Google</span>
+                <img src="https://www.google.com/favicon.ico" className="size-5 brightness-0 invert" alt="" />
+                Continue with Google
               </button>
             )}
             {loading && (

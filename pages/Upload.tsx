@@ -2,24 +2,30 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { soundService } from '../services/soundService';
-import { geminiService } from '../services/geminiService';
+import { ImageAnalysis } from '../services/geminiService';
+import { aiCacheService } from '../services/aiCacheService';
 import { cloudinaryService } from '../services/cloudinaryService';
-import { Wallpaper, AspectRatio } from '../types';
+import { Wallpaper, AspectRatio, User } from '../types';
 import { MoodDiscovery } from './MoodDiscovery';
 import { AnimateIcon } from '../components/ui/AnimateIcon';
-import { CloudUploadIcon, BrainIcon, ArrowRightIcon, ArrowLeftIcon, SparklesIcon, XIcon, EyeIcon, EyeOffIcon } from '../components/ui/Icons';
+import { CloudUploadIcon, BrainIcon, ArrowRightIcon, ArrowLeftIcon, SparklesIcon, XIcon, EyeIcon, EyeOffIcon, LensIcon } from '../components/ui/Icons';
+import { useNavigate } from 'react-router-dom';
 
 interface UploadProps {
   onUploadSuccess: (wp: Wallpaper) => void;
+  currentUser: User | null;
+  onAuthRequired: () => void;
 }
 
 type StudioMode = 'choice' | 'upload' | 'ai-lab' | 'analyzing' | 'metadata' | 'publishing';
 
-export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
+export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, onAuthRequired }) => {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<StudioMode>('choice');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [aiAnalysis, setAiAnalysis] = useState<ImageAnalysis | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio>('9:16');
   const [deviceTarget, setDeviceTarget] = useState<'phone' | 'pc' | 'tab'>('phone');
@@ -44,15 +50,16 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
       setMode('analyzing');
 
       try {
-        const base64Data = base64.split(',')[1];
-        const suggestedTags = await geminiService.suggestTags(base64Data);
-        setTags(suggestedTags);
-        const cleanName = file.name.split('.')[0].replace(/[-_]/g, ' ');
-        setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+        // Use cached AI analysis (localStorage → Gemini API)
+        const analysis = await aiCacheService.getImageAnalysis(base64);
+        setAiAnalysis(analysis);
+        setTags(analysis.tags);
+        setTitle(analysis.title || file.name.split('.')[0].replace(/[-_]/g, ' '));
         soundService.playSuccess();
         setMode('metadata');
       } catch (err) {
         setTags(['Original', 'Upload']);
+        setTitle(file.name.split('.')[0].replace(/[-_]/g, ' '));
         setMode('metadata');
       }
     };
@@ -66,18 +73,23 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
     soundService.playSuccess();
 
     try {
-      // Upload to Cloudinary instead of using base64
       const cloudinaryUrl = await cloudinaryService.uploadImage(previewUrl);
-
       const newWallpaper: Wallpaper = {
         id: `aura-${Date.now()}`,
         title: title || 'Untitled Aura',
         author: 'You',
         authorAvatar: 'https://i.pravatar.cc/150?u=you',
-        url: cloudinaryUrl, // Now a secure remote URL
+        url: cloudinaryUrl,
         views: '0',
         downloads: '0',
         likes: '0',
+        // Persist AI analysis for reuse (avoid repeat API calls)
+        aiInsight: aiAnalysis?.description || '',
+        aiDescription: aiAnalysis?.description || '',
+        aiColors: aiAnalysis?.colors || [],
+        aiMood: aiAnalysis?.mood || '',
+        aiCategory: aiAnalysis?.category || '',
+        aiObjects: aiAnalysis?.objects || [],
         type: isLive ? 'live' : 'static',
         tags: tags.length > 0 ? tags : ['Original'],
         aspectRatio: selectedRatio,
@@ -117,16 +129,16 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Creative Studio</span>
               </div>
               <h2 className="text-6xl lg:text-7xl font-black mb-4 tracking-tighter leading-none italic">Aura Studio</h2>
-              <p className="text-black/30 dark:text-white/30 font-bold text-sm label-meta tracking-widest text-center">Visual Synthesis Engine v4.0</p>
+              <p className="text-black/30 dark:text-white/30 font-bold text-sm label-meta tracking-widest text-center">Visual Synthesis Engine v5.0 — Gemini Vision</p>
             </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
               {[
                 {
                   id: 'upload',
                   icon: CloudUploadIcon,
                   title: 'Direct Upload',
-                  desc: 'Publish your high-res originals',
+                  desc: 'AI analyzes your image instantly',
                   color: 'primary',
                   action: () => fileInputRef.current?.click()
                 },
@@ -137,6 +149,14 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
                   desc: 'Synthesize new auras with AI',
                   color: 'accent',
                   action: () => setMode('ai-lab')
+                },
+                {
+                  id: 'lens',
+                  icon: LensIcon,
+                  title: 'AI Lens',
+                  desc: 'Scan anything, find wallpapers',
+                  color: 'tertiary',
+                  action: () => navigate('/lens')
                 }
               ].map((item, i) => (
                 <motion.button
@@ -145,20 +165,20 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 + (i * 0.1) }}
                   onClick={() => { soundService.playTap(); item.action(); }}
-                  className="group relative flex flex-col items-start p-10 rounded-[32px] border border-black/5 dark:border-white/5 bg-surface-light dark:bg-surface-dark overflow-hidden transition-all duration-500 hover:border-accent/40 hover:scale-[1.02] text-left"
+                  className="group relative flex flex-col items-start p-10 rounded-[48px] border border-outline/10 bg-surface transition-all duration-500 hover:border-primary/40 hover:scale-[1.02] text-left shadow-1 hover:shadow-3"
                 >
                   <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-accent/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className={`size-16 rounded-2xl bg-${item.color}/10 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform`}>
+                  <div className={`size-20 rounded-[32px] bg-primary/10 flex items-center justify-center mb-8 group-hover:scale-110 transition-transform`}>
                     <AnimateIcon animation="path">
-                      <item.icon size={40} className={`text-${item.color}`} />
+                      <item.icon size={48} className="text-primary" />
                     </AnimateIcon>
                   </div>
-                  <h3 className="text-2xl font-black mb-3 tracking-tight">{item.title}</h3>
-                  <p className="text-black/40 dark:text-white/40 text-[10px] font-black uppercase tracking-widest leading-relaxed mb-6">{item.desc}</p>
-                  <div className="flex items-center gap-2 text-accent opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transition-all">
-                    <span className="text-[10px] font-black uppercase tracking-widest">Connect Engine</span>
+                  <h3 className="text-3xl font-black mb-3 tracking-tight text-on-surface uppercase tracking-wider">{item.title}</h3>
+                  <p className="text-on-surface-variant text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed mb-8">{item.desc}</p>
+                  <div className="flex items-center gap-2 text-primary opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-10px] group-hover:translate-x-0 transition-all">
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Initialize Engine</span>
                     <AnimateIcon animation="default">
-                      <ArrowRightIcon size={14} />
+                      <ArrowRightIcon size={16} />
                     </AnimateIcon>
                   </div>
                 </motion.button>
@@ -177,13 +197,13 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
             className="w-full h-full pt-10"
           >
             <div className="mb-12 flex items-center justify-between">
-              <button onClick={handleBack} className="group flex items-center gap-3 text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors">
-                <div className="size-10 rounded-full border border-black/5 dark:border-white/5 flex items-center justify-center group-hover:border-black/20 dark:group-hover:border-white/20 transition-all">
+              <button onClick={handleBack} className="group flex items-center gap-3 text-on-surface-variant hover:text-on-surface transition-colors">
+                <div className="size-11 rounded-full border border-outline/10 flex items-center justify-center group-hover:bg-surface-variant transition-all">
                   <AnimateIcon animation="default">
-                    <ArrowLeftIcon size={14} />
+                    <ArrowLeftIcon size={16} />
                   </AnimateIcon>
                 </div>
-                <span className="label-meta">Back to Studio</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Back to Studio</span>
               </button>
               <div className="flex items-center gap-2">
                 <div className="size-2 bg-accent rounded-full animate-pulse" />
@@ -237,8 +257,8 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
               </div>
             </div>
 
-            <h3 className="text-3xl font-black mb-4 tracking-tighter leading-none">AI Insight Synthesis</h3>
-            <p className="text-black/30 dark:text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Scanning Visual Chromatics...</p>
+            <h3 className="text-3xl font-black mb-4 tracking-tighter leading-none">Gemini Vision Analysis</h3>
+            <p className="text-black/30 dark:text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">AI is analyzing your image...</p>
           </motion.div>
         )}
 
@@ -247,7 +267,7 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
             key="publishing"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-3xl"
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-surface/95 backdrop-blur-3xl"
           >
             <div className="max-w-md w-full px-10 text-center">
               <div className="relative size-32 mx-auto mb-16">
@@ -311,7 +331,7 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
 
         {mode === 'metadata' && (
           <motion.div key="metadata" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="max-w-xl mx-auto pb-32">
-            <div className="flex items-center justify-between mb-16">
+            <div className="flex items-center justify-between mb-12">
               <h2 className="text-3xl font-black tracking-tight">Final Details</h2>
               <button onClick={handleBack} className="text-black/30 dark:text-white/30 hover:text-black dark:hover:text-white transition-colors">
                 <AnimateIcon animation="default">
@@ -320,24 +340,79 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
               </button>
             </div>
 
-            <div className="space-y-12">
+            <div className="space-y-10">
+
+              {/* AI Analysis Card */}
+              {aiAnalysis && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-6 rounded-3xl bg-gradient-to-br from-primary/10 via-accent/5 to-transparent border border-primary/20"
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <SparklesIcon size={16} className="text-accent" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Gemini Vision Analysis</span>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-sm text-on-surface/80 italic mb-5 leading-relaxed">"{aiAnalysis.description}"</p>
+
+                  {/* Color Palette */}
+                  <div className="mb-5">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2 block">Detected Colors</span>
+                    <div className="flex gap-2 flex-wrap">
+                      {aiAnalysis.colors.map((c, i) => (
+                        <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface/50 border border-outline/10">
+                          <div className="size-3 rounded-full ring-1 ring-black/10" style={{ backgroundColor: c.hex }} />
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">{c.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Objects & Mood */}
+                  <div className="flex gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-accent">Mood: {aiAnalysis.mood}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-primary">Category: {aiAnalysis.category}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Image Preview */}
+              {previewUrl && (
+                <div className="relative rounded-3xl overflow-hidden aspect-video border border-outline/10">
+                  <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              {/* Target Format */}
               <div className="space-y-4">
                 <label className="label-meta text-black/30 dark:text-white/30">Target Format</label>
                 <div className="grid grid-cols-4 gap-3">
-                  {['Mobile', 'Desktop', 'Tablet', 'Square'].map((label) => (
-                    <button
-                      key={label}
-                      className={`py-4 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${selectedRatio === (label === 'Mobile' ? '9:16' : '1:1')
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-transparent border-black/5 dark:border-white/5 text-black/40 dark:text-white/40'
-                        }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  {(['Mobile', 'Desktop', 'Tablet', 'Square'] as const).map((label) => {
+                    const ratioMap: Record<string, AspectRatio> = { Mobile: '9:16', Desktop: '16:9', Tablet: '4:3', Square: '1:1' };
+                    const ratio = ratioMap[label];
+                    return (
+                      <button
+                        key={label}
+                        onClick={() => setSelectedRatio(ratio)}
+                        className={`py-4 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${selectedRatio === ratio
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-transparent border-black/5 dark:border-white/5 text-black/40 dark:text-white/40'
+                          }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Title */}
               <div className="space-y-4">
                 <label className="label-meta text-black/30 dark:text-white/30">Aura Title</label>
                 <input
@@ -348,6 +423,19 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
                 />
               </div>
 
+              {/* AI Tags */}
+              <div className="space-y-4">
+                <label className="label-meta text-black/30 dark:text-white/30">AI-Generated Tags</label>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag, i) => (
+                    <span key={i} className="px-4 py-2 rounded-full bg-secondary-container/30 text-[10px] font-black uppercase tracking-widest text-on-secondary-container border border-outline/10">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Visibility Toggle */}
               <div className="bg-black/5 dark:bg-white/5 p-6 rounded-2xl flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-widest mb-1">Public Universe</p>
@@ -366,7 +454,7 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess }) => {
               <button
                 onClick={handleFinalize}
                 disabled={isPublishing}
-                className="w-full bg-primary dark:bg-white text-white dark:text-black h-20 rounded-lg font-black text-[11px] uppercase tracking-[0.3em] shadow-subtle hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50"
+                className="w-full h-20 bg-primary text-on-primary rounded-full font-black text-xs uppercase tracking-[0.3em] shadow-2 hover:shadow-3 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50"
               >
                 {isPublishing ? 'Synchronizing...' : 'Publish to Universe'}
               </button>

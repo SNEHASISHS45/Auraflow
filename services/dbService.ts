@@ -39,6 +39,7 @@ export const dbService = {
 
   async getAllWallpapers(): Promise<Wallpaper[]> {
     try {
+      // Requires composite index on [visibility, createdAt]
       const q = query(
         collection(db, COLLECTION_NAME),
         where("visibility", "==", "public"),
@@ -101,6 +102,7 @@ export const dbService = {
 
   async getNotifications(userId: string): Promise<any[]> {
     try {
+      // Requires composite index on [userId, createdAt]
       const q = query(
         collection(db, 'notifications'),
         where("userId", "==", userId),

@@ -67,17 +67,19 @@ const WallpaperCard = React.memo(({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      whileInView={{ opacity: 1, scale: 1, y: 0 }}
+      whileHover={{ y: -5 }}
+      whileTap={{ scale: 0.96 }}
       viewport={{ once: true }}
-      transition={{ duration: 0.6, delay: (index % 5) * 0.05 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25, delay: (index % 5) * 0.05 }}
       onClick={() => onSelect(wp)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className="group cursor-pointer"
     >
       <div
-        className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-surface-light dark:bg-surface-dark border border-black/5 dark:border-white/5 transition-all group-hover:border-black/20 dark:group-hover:border-white/20 group-hover:shadow-xl"
+        className="relative aspect-[3/4] overflow-hidden rounded-3xl bg-surface-variant/20 border border-outline/10 transition-all group-hover:border-primary/30 group-hover:shadow-3 group-active:scale-95"
         style={{ backgroundColor: item.avgColor || undefined }}
       >
         {!imageLoaded && (
@@ -98,28 +100,28 @@ const WallpaperCard = React.memo(({
           <img
             src={item.thumbnailUrl || item.url}
             onLoad={() => setImageLoaded(true)}
-            className={`w-full h-full object-cover transition-transform duration-700 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-105`}
+            className={`w-full h-full object-cover transition-transform duration-1000 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-105`}
             alt={wp.title}
             loading="lazy"
           />
         )}
 
-        {/* Video indicator - only show if there's an actual video */}
+        {/* Video indicator */}
         {isVideo && (
-          <div className={`absolute top-3 right-3 size-8 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 transition-opacity ${isHovered ? 'opacity-0' : 'opacity-100'}`}>
-            <Play size={14} className="text-white fill-white ml-0.5" />
+          <div className={`absolute top-4 right-4 size-8 bg-surface/60 backdrop-blur-md rounded-full flex items-center justify-center border border-outline/20 transition-opacity ${isHovered ? 'opacity-0' : 'opacity-100'}`}>
+            <Play size={14} className="text-on-surface fill-on-surface ml-0.5" />
           </div>
         )}
 
         {/* Gradient overlay on hover */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
         {/* Quick like button on hover */}
         <button
           onClick={(e) => onLike(e, wp.id)}
-          className={`absolute bottom-3 right-3 size-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${isLiked
-            ? 'bg-red-500 text-white'
-            : 'bg-white/20 text-white hover:bg-white/30'
+          className={`absolute bottom-4 right-4 size-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${isLiked
+            ? 'bg-primary text-on-primary'
+            : 'bg-surface/40 text-on-surface hover:bg-surface/60 border border-outline/10'
             }`}
         >
           <AnimateIcon animation={isLiked ? 'default' : 'initial'}>
@@ -128,12 +130,12 @@ const WallpaperCard = React.memo(({
         </button>
       </div>
 
-      <div className="mt-3 px-1">
-        <h3 className="text-sm font-semibold text-primary dark:text-white truncate">
+      <div className="mt-4 px-2">
+        <h3 className="text-sm font-bold text-on-surface truncate tracking-tight">
           {wp.title}
         </h3>
-        <p className="text-xs text-black/50 dark:text-white/50 mt-0.5">
-          by {wp.author}
+        <p className="text-[11px] font-medium text-on-surface-variant mt-0.5 uppercase tracking-wider">
+          {wp.author}
         </p>
       </div>
     </motion.div>
@@ -261,14 +263,14 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
 
 
         {/* Categories */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 -mx-4 px-4 lg:mx-0 lg:px-0">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-4 -mx-4 px-4 lg:mx-0 lg:px-0">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => { setSelectedCategory(cat); soundService.playTick(); }}
-              className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${selectedCategory === cat
-                ? 'bg-black dark:bg-white text-white dark:text-black'
-                : 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/20'
+              className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-[0.15em] transition-all whitespace-nowrap border ${selectedCategory === cat
+                ? 'bg-secondary-container text-on-secondary-container border-transparent shadow-sm'
+                : 'bg-surface text-on-surface-variant border-outline/30 hover:bg-surface-variant/30'
                 }`}
             >
               {cat}
@@ -312,7 +314,7 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-            className="size-8 border-2 border-black/10 dark:border-white/10 border-t-accent rounded-full"
+            className="size-8 border-4 border-primary/20 border-t-primary rounded-full"
           />
         </div>
       )}
