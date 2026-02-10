@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { AppTab, Wallpaper, User } from './types';
 import { BottomNav, TopBar, Sidebar } from './components/Navigation';
-import { Home } from './pages/Home';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
+import { NotificationPanel } from './components/NotificationPanel';
+import { ProfileSkeleton } from './components/Skeleton';
+import { motion, AnimatePresence } from 'framer-motion';
+import { dbService } from './services/dbService';
+import { authService } from './services/authService';
+import { soundService } from './services/soundService';
 
 // Lazy load heavy components
-// Optimization: Code splitting reduces initial bundle size by lazy loading these routes.
-// Expected impact: ~70kB raw / ~22kB gzip reduction in initial JS payload.
+const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
 const Explore = lazy(() => import('./pages/Explore').then(module => ({ default: module.Explore })));
 const Upload = lazy(() => import('./pages/Upload').then(module => ({ default: module.Upload })));
 const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })));
@@ -15,12 +19,12 @@ const Saved = lazy(() => import('./pages/Saved').then(module => ({ default: modu
 const Detail = lazy(() => import('./pages/Detail').then(module => ({ default: module.Detail })));
 const Auth = lazy(() => import('./pages/Auth').then(module => ({ default: module.Auth })));
 const SearchOverlay = lazy(() => import('./components/SearchOverlay').then(module => ({ default: module.SearchOverlay })));
-import { NotificationPanel } from './components/NotificationPanel';
-import { ProfileSkeleton } from './components/Skeleton';
-import { motion, AnimatePresence } from 'framer-motion';
-import { dbService } from './services/dbService';
-import { authService } from './services/authService';
-import { soundService } from './services/soundService';
+
+const OverlayFallback = () => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+  </div>
+);
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -154,102 +158,104 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-y-auto no-scrollbar relative">
           <AnimatePresence>
-            <Routes location={location}>
-              <Route path="/" element={
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                  className="h-full"
-                >
-                  <Home onSelect={setSelectedWallpaper} likedIds={likedIds} onLike={(id) => {
-                    setLikedIds(prev => {
-                      const next = prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
-                      localStorage.setItem('aura_liked_ids', JSON.stringify(next));
-                      return next;
-                    });
-                  }} customWallpapers={wallpapers} />
-                </motion.div>
-              } />
-              <Route path="/explore" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="h-full"
-                >
-                  <Suspense fallback={<ProfileSkeleton />}>
-                    <Explore onSelect={setSelectedWallpaper} />
-                  </Suspense>
-                </motion.div>
-              } />
-              <Route path="/upload" element={
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="h-full"
-                >
-                  <Suspense fallback={<ProfileSkeleton />}>
-                    <Upload onUploadSuccess={async (wp) => {
-                      if (currentUser) {
-                        const wallpaperData = {
-                          ...wp,
-                          author: currentUser.name,
-                          authorAvatar: currentUser.avatar,
-                          authorId: currentUser.id
-                        };
-                        await dbService.saveWallpaper(wallpaperData);
-                        navigate('/');
-                        refreshWallpapers();
-                      }
-                    }} currentUser={currentUser} onAuthRequired={() => setShowAuth(true)} />
-                  </Suspense>
-                </motion.div>
-              } />
-              <Route path="/saved" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="h-full"
-                >
-                  <Suspense fallback={<ProfileSkeleton />}>
-                    <Saved onSelect={setSelectedWallpaper} savedIds={savedIds} wallpapers={wallpapers} />
-                  </Suspense>
-                </motion.div>
-              } />
-              <Route path="/profile" element={
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 1.02 }}
-                  transition={{ duration: 0.2 }}
-                  className="h-full"
-                >
-                  <Suspense fallback={<ProfileSkeleton />}>
-                    <Profile
-                      currentUser={currentUser}
-                      onUserUpdate={(updatedUser) => {
-                        setCurrentUser(updatedUser);
-                      }}
-                      onSignInClick={() => setShowAuth(true)}
-                      onSignOut={async () => {
-                        await authService.signOut();
-                        setCurrentUser(null);
-                        soundService.playSuccess();
-                      }}
-                      onRefresh={refreshWallpapers}
-                    />
-                  </Suspense>
-                </motion.div>
-              } />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <Suspense fallback={<ProfileSkeleton />}>
+              <Routes location={location}>
+                <Route path="/" element={
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.02 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-full"
+                  >
+                    <Home onSelect={setSelectedWallpaper} likedIds={likedIds} onLike={(id) => {
+                      setLikedIds(prev => {
+                        const next = prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
+                        localStorage.setItem('aura_liked_ids', JSON.stringify(next));
+                        return next;
+                      });
+                    }} customWallpapers={wallpapers} />
+                  </motion.div>
+                } />
+                <Route path="/explore" element={
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-full"
+                  >
+                    <Suspense fallback={<ProfileSkeleton />}>
+                      <Explore onSelect={setSelectedWallpaper} />
+                    </Suspense>
+                  </motion.div>
+                } />
+                <Route path="/upload" element={
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-full"
+                  >
+                    <Suspense fallback={<ProfileSkeleton />}>
+                      <Upload onUploadSuccess={async (wp) => {
+                        if (currentUser) {
+                          const wallpaperData = {
+                            ...wp,
+                            author: currentUser.name,
+                            authorAvatar: currentUser.avatar,
+                            authorId: currentUser.id
+                          };
+                          await dbService.saveWallpaper(wallpaperData);
+                          navigate('/');
+                          refreshWallpapers();
+                        }
+                      }} currentUser={currentUser} onAuthRequired={() => setShowAuth(true)} />
+                    </Suspense>
+                  </motion.div>
+                } />
+                <Route path="/saved" element={
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-full"
+                  >
+                    <Suspense fallback={<ProfileSkeleton />}>
+                      <Saved onSelect={setSelectedWallpaper} savedIds={savedIds} wallpapers={wallpapers} />
+                    </Suspense>
+                  </motion.div>
+                } />
+                <Route path="/profile" element={
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.02 }}
+                    transition={{ duration: 0.2 }}
+                    className="h-full"
+                  >
+                    <Suspense fallback={<ProfileSkeleton />}>
+                      <Profile
+                        currentUser={currentUser}
+                        onUserUpdate={(updatedUser) => {
+                          setCurrentUser(updatedUser);
+                        }}
+                        onSignInClick={() => setShowAuth(true)}
+                        onSignOut={async () => {
+                          await authService.signOut();
+                          setCurrentUser(null);
+                          soundService.playSuccess();
+                        }}
+                        onRefresh={refreshWallpapers}
+                      />
+                    </Suspense>
+                  </motion.div>
+                } />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
           </AnimatePresence>
         </main>
 
@@ -258,7 +264,7 @@ const App: React.FC = () => {
 
       <AnimatePresence>
         {selectedWallpaper && (
-          <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />}>
+          <Suspense fallback={<OverlayFallback />}>
             <Detail
               wallpaper={selectedWallpaper}
               isLiked={likedIds.includes(selectedWallpaper.id)}
@@ -289,7 +295,7 @@ const App: React.FC = () => {
         )}
 
         {isSearchOpen && (
-          <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />}>
+          <Suspense fallback={<OverlayFallback />}>
             <SearchOverlay
               wallpapers={wallpapers}
               onSelect={(wp) => { setSelectedWallpaper(wp); setIsSearchOpen(false); }}
@@ -299,7 +305,7 @@ const App: React.FC = () => {
         )}
 
         {showAuth && (
-          <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />}>
+          <Suspense fallback={<OverlayFallback />}>
             <Auth onSuccess={setCurrentUser} onClose={() => setShowAuth(false)} onBack={() => setShowAuth(false)} />
           </Suspense>
         )}
