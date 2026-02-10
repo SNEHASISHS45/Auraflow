@@ -45,6 +45,7 @@ const WallpaperCard = React.memo(({
   isLiked: boolean;
   index: number;
 }) => {
+  // Memoize the wallpaper object so it doesn't change on every render
   const wp = useMemo(() => toWallpaper(item), [item]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -238,7 +239,7 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
   })), [customWallpapers]);
 
   // Filter items based on selected category
-  const getDisplayItems = (): WallpaperItem[] => {
+  const allItems = useMemo(() => {
     if (selectedCategory === 'Curated') {
       // Show custom uploads + Pexels mixed feed
       return [...customItems, ...pexelsItems];
@@ -251,9 +252,7 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
       // Show only Pexels items for other categories
       return pexelsItems;
     }
-  };
-
-  const allItems = getDisplayItems();
+  }, [selectedCategory, customItems, pexelsItems]);
 
   return (
     <div className="pb-32 px-4 lg:px-12">
