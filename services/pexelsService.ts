@@ -140,16 +140,30 @@ function videoToWallpaper(video: PexelsVideo): WallpaperItem {
     };
 }
 
+// Cache for curated photos
+const curatedCache = new Map<string, { timestamp: number, data: WallpaperItem[] }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export const pexelsService = {
     /**
      * Get curated photos for the home feed
      */
     async getCurated(page: number = 1, perPage: number = 20): Promise<WallpaperItem[]> {
+        const cacheKey = `curated-${page}-${perPage}`;
+        const cached = curatedCache.get(cacheKey);
+
+        if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+            return cached.data;
+        }
+
         try {
             const response = await fetch(`${BASE_URL}/curated?page=${page}&per_page=${perPage}`, { headers });
             if (!response.ok) throw new Error('Failed to fetch curated photos');
             const data: PexelsSearchResponse = await response.json();
-            return data.photos.map(photoToWallpaper);
+            const result = data.photos.map(photoToWallpaper);
+
+            curatedCache.set(cacheKey, { timestamp: Date.now(), data: result });
+            return result;
         } catch (error) {
             console.error('Pexels curated error:', error);
             return [];
