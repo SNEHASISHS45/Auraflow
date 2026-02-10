@@ -237,7 +237,7 @@ Return ONLY valid JSON, no markdown.`
       colors: [
         { name: 'Primary', hex: '#6750A4' },
         { name: 'Accent', hex: '#D0BCFF' },
-        { name: 'Dark', hex: '#1C1B1F' }
+        { name: 'Dark', hex: '#000000' }
       ],
       objects: ['Digital Art', 'Composition'],
       style: 'Modern Digital',

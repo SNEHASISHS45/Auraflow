@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AppTab } from '../types';
+import { motion, AnimatePresence, useTransform, MotionValue } from 'framer-motion';
+import { AppTab, User } from '../types';
 import { soundService } from '../services/soundService';
 import { AnimateIcon } from './ui/AnimateIcon';
 import { HomeIcon, SearchIcon, PlusIcon, BookmarkIcon, UserIcon, BellIcon, ArrowLeftIcon, SparklesIcon } from './ui/Icons';
@@ -13,8 +13,6 @@ const tabs = [
   { id: AppTab.SAVED, icon: BookmarkIcon, label: 'Saved' },
   { id: AppTab.PROFILE, icon: UserIcon, label: 'Profile' }
 ];
-
-import { User } from '../types';
 
 interface NavProps {
   activeTab: AppTab;
@@ -130,75 +128,90 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, onNotific
   );
 };
 
-export const TopBar: React.FC<NavProps & { title: string; hideOnDesktop?: boolean; onSearchClick?: () => void }> = ({
+export const TopBar: React.FC<NavProps & { title: string; hideOnDesktop?: boolean; onSearchClick?: () => void; pullY?: MotionValue<number> }> = ({
   title,
   hideOnDesktop,
   canGoBack,
   onBack,
   onNotificationOpen,
-  onSearchClick
+  onSearchClick,
+  pullY
 }) => {
   const [isScrolled, setIsScrolled] = React.useState(false);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+
+  // Use a transform that becomes 'none' when at rest to preserve position: sticky
+  const transform = useTransform(pullY || new MotionValue(0), (v) => v === 0 ? "none" : `translateY(${v}px)`);
 
   React.useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsScrolled(!entry.isIntersecting);
+      },
+      { threshold: [1.0], rootMargin: '-1px 0px 0px 0px' }
+    );
+
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+
+    return () => observer.disconnect();
   }, []);
 
   if (hideOnDesktop) return null;
 
   return (
-    <header
-      className={`sticky top-0 z-[90] px-4 h-16 flex items-center justify-between transition-all duration-300 ${isScrolled
-        ? 'bg-surface/90 backdrop-blur-md border-b border-outline/10'
-        : 'bg-transparent'
-        }`}
-    >
-      <div className="flex-1 flex items-center">
-        {canGoBack ? (
-          <button onClick={onBack} className="p-2 rounded-full hover:bg-surface-variant/50 transition-colors">
-            <AnimateIcon animation="default">
-              <ArrowLeftIcon size={24} className="text-on-surface" />
-            </AnimateIcon>
-          </button>
-        ) : (
-          <div className="p-2">
-            <AnimateIcon animation="default">
-              <SparklesIcon size={24} className="text-primary" />
-            </AnimateIcon>
-          </div>
-        )}
-      </div>
+    <>
+      <div ref={sentinelRef} className="h-px w-full absolute top-0 pointer-events-none" />
+      <motion.header
+        className={`sticky top-0 z-[90] px-4 h-16 flex items-center justify-between transition-all duration-300 ${isScrolled
+          ? 'bg-surface/90 backdrop-blur-md border-b border-outline/10'
+          : 'bg-transparent'
+          }`}
+      >
+        <div className="flex-1 flex items-center">
+          {canGoBack ? (
+            <button onClick={onBack} className="p-2 rounded-full hover:bg-surface-variant/50 transition-colors">
+              <AnimateIcon animation="default">
+                <ArrowLeftIcon size={24} className="text-on-surface" />
+              </AnimateIcon>
+            </button>
+          ) : (
+            <div className="p-2">
+              <AnimateIcon animation="default">
+                <SparklesIcon size={24} className="text-primary" />
+              </AnimateIcon>
+            </div>
+          )}
+        </div>
 
-      <div className="absolute left-1/2 -translate-x-1/2 text-center overflow-hidden max-w-[50%]">
-        <h2 className="text-sm font-black uppercase tracking-[0.3em] text-on-surface truncate">{title}</h2>
-      </div>
+        <div className="absolute left-1/2 -translate-x-1/2 text-center overflow-hidden max-w-[50%]">
+          <h2 className="text-sm font-black uppercase tracking-[0.3em] text-on-surface truncate">{title}</h2>
+        </div>
 
-      <div className="flex-1 flex items-center justify-end gap-1">
-        {onSearchClick && (
+        <div className="flex-1 flex items-center justify-end gap-1">
+          {onSearchClick && (
+            <button
+              onClick={() => { soundService.playTick(); onSearchClick(); }}
+              className="size-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/80 transition-colors"
+            >
+              <AnimateIcon animation="path">
+                <SearchIcon size={20} />
+              </AnimateIcon>
+            </button>
+          )}
+
           <button
-            onClick={() => { soundService.playTick(); onSearchClick(); }}
-            className="size-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/80 transition-colors"
+            onClick={() => { soundService.playTick(); onNotificationOpen?.(); }}
+            className="size-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/80 relative transition-colors"
           >
-            <AnimateIcon animation="path">
-              <SearchIcon size={20} />
+            <AnimateIcon animation="default">
+              <BellIcon size={22} />
             </AnimateIcon>
+            <div className="absolute top-2.5 right-2.5 size-2 bg-primary rounded-full border-2 border-surface" />
           </button>
-        )}
-
-        <button
-          onClick={() => { soundService.playTick(); onNotificationOpen?.(); }}
-          className="size-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/80 relative transition-colors"
-        >
-          <AnimateIcon animation="default">
-            <BellIcon size={22} />
-          </AnimateIcon>
-          <div className="absolute top-2.5 right-2.5 size-2 bg-primary rounded-full border-2 border-surface" />
-        </button>
-      </div>
-    </header>
+        </div>
+      </motion.header>
+    </>
   );
 };

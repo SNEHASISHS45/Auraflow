@@ -5,7 +5,7 @@ import { BottomNav, TopBar, Sidebar } from './components/Navigation';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { NotificationPanel } from './components/NotificationPanel';
 import { ProfileSkeleton } from './components/Skeleton';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { dbService } from './services/dbService';
 import { authService } from './services/authService';
 import { soundService } from './services/soundService';
@@ -29,6 +29,7 @@ const OverlayFallback = () => (
 );
 
 const App: React.FC = () => {
+  const pullY = useMotionValue(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -145,7 +146,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface flex flex-row lg:overflow-hidden font-display selection:bg-primary/30">
+    <div className="h-[100dvh] bg-surface text-on-surface flex flex-row lg:overflow-hidden font-display selection:bg-primary/30">
       {isDesktop && (
         <Sidebar
           activeTab={activeTab}
@@ -154,20 +155,21 @@ const App: React.FC = () => {
         />
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        <TopBar
-          title={activeTab}
-          hideOnDesktop={isDesktop}
-          activeTab={activeTab}
-          setActiveTab={navigateToTab}
-          canGoBack={location.pathname !== '/'}
-          onBack={handleBack}
-          onNotificationOpen={() => setIsNotificationOpen(true)}
-          onSearchClick={() => navigateToTab(AppTab.EXPLORE)}
-        />
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        <main className="flex-1 overflow-y-auto no-scrollbar relative" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <PullToRefresh onRefresh={refreshWallpapers} pullY={pullY}>
+            <TopBar
+              title={activeTab}
+              hideOnDesktop={isDesktop}
+              activeTab={activeTab}
+              setActiveTab={navigateToTab}
+              canGoBack={location.pathname !== '/'}
+              onBack={handleBack}
+              onNotificationOpen={() => setIsNotificationOpen(true)}
+              onSearchClick={() => navigateToTab(AppTab.EXPLORE)}
+              pullY={pullY}
+            />
 
-        <main className="flex-1 overflow-y-auto no-scrollbar relative">
-          <PullToRefresh onRefresh={refreshWallpapers}>
             <AnimatePresence mode="wait">
               <Suspense fallback={<ProfileSkeleton />}>
                 <motion.div key={location.pathname}>
