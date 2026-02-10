@@ -260,6 +260,7 @@ const App: React.FC = () => {
 
         {!isDesktop && <BottomNav activeTab={activeTab} setActiveTab={navigateToTab} currentUser={currentUser} />}
       </div>
+
       <AnimatePresence>
         {selectedWallpaper && (
           <Suspense fallback={<OverlayFallback />}>
@@ -308,7 +309,7 @@ const App: React.FC = () => {
         onClose={() => setIsNotificationOpen(false)}
         currentUser={currentUser}
       />
-    </div >
+    </div>
   );
 };
 
