@@ -13,3 +13,7 @@
 ## 2026-02-05 - Lazy Loading Discrepancy
 **Learning:** The project memory claimed application pages were lazy-loaded, but the actual code (`App.tsx`) used synchronous imports. This significantly increased the initial bundle size.
 **Action:** Always verify "known" architectural patterns against the actual code. When implementing lazy loading for named exports, use `lazy(() => import('./path').then(m => ({ default: m.Component })))`.
+
+## 2024-05-23 - Code Splitting Routes with AnimatePresence
+**Learning:** Implementing code splitting (`React.lazy`) on `react-router-dom` routes wrapped in `AnimatePresence` requires careful handling. `AnimatePresence` relies on the direct child having a unique `key` to trigger exit animations. Since `Routes` handles the rendering, we must place the `key={location.pathname}` prop on `Routes` itself.
+**Action:** When combining `AnimatePresence`, `Routes`, and `Suspense`, ensure `Suspense` wraps `AnimatePresence` (or vice versa depending on desired loading behavior) and `Routes` is keyed. Use the `import().then(m => ({ default: m.NamedExport }))` pattern for lazy loading named exports.

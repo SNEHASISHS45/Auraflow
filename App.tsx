@@ -165,9 +165,9 @@ const App: React.FC = () => {
         />
 
         <main className="flex-1 overflow-y-auto no-scrollbar relative">
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             <Suspense fallback={<ProfileSkeleton />}>
-              <Routes location={location}>
+              <Routes location={location} key={location.pathname}>
                 <Route path="/" element={
                   <motion.div
                     initial={{ opacity: 0, scale: 0.98 }}
