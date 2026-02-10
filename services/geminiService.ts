@@ -2,6 +2,14 @@
  * Local AI Service - No external API dependencies
  * Generates insights and tags using local logic
  */
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const API_KEY = import.meta.env?.VITE_GEMINI_API_KEY;
+let genAI: GoogleGenerativeAI | null = null;
+
+if (API_KEY) {
+  genAI = new GoogleGenerativeAI(API_KEY);
+}
 
 // Curated insight templates for different wallpaper types
 const insightTemplates = [
@@ -90,8 +98,20 @@ export const geminiService = {
    * No API calls - completely offline capable
    */
   async getWallpaperInsight(title: string, tags: string[]): Promise<string> {
-    // Small delay to simulate async behavior
-    await new Promise(resolve => setTimeout(resolve, 300));
+    if (genAI) {
+      try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Generate a short, creative, and engaging insight (one sentence) for a wallpaper with the title "${title}" and tags: ${tags.join(', ')}. Return only the insight text.`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        if (text) return text.trim();
+      } catch (error) {
+        console.warn("Gemini API failed, falling back to local insights", error);
+      }
+    }
 
     // Try to find a tag-specific insight
     const lowerTags = tags.map(t => t.toLowerCase());
