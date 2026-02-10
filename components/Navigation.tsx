@@ -80,9 +80,9 @@ export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, current
 
 export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, isDarkMode, onToggleTheme, onNotificationOpen }) => {
   return (
-    <aside className="hidden lg:flex flex-col w-72 h-screen border-r border-black/5 dark:border-white/5 bg-background-light dark:bg-background-dark p-12 z-[110]">
+    <aside className="hidden lg:flex flex-col w-72 h-screen border-r border-white/5 bg-black p-12 z-[110]">
       <div className="mb-24">
-        <h1 className="text-2xl font-black tracking-tighter uppercase">AuraFlow</h1>
+        <h1 className="text-2xl font-black tracking-tighter uppercase text-white">AuraFlow</h1>
       </div>
 
       <nav className="flex-1 space-y-8">
@@ -148,7 +148,7 @@ export const TopBar: React.FC<NavProps & { title: string; hideOnDesktop?: boolea
   return (
     <header
       className={`sticky top-0 z-[90] px-6 h-16 flex items-center justify-between lg:hidden transition-all duration-300 ${isScrolled
-        ? 'glass-nav border-b border-white/5'
+        ? 'bg-black border-b border-white/5'
         : 'bg-transparent'
         }`}
     >

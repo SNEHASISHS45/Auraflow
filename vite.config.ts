@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
           name: 'Auraflow',
           short_name: 'Auraflow',
           description: 'Your personal aura and flow tracking application.',
-          theme_color: '#ffffff',
+          theme_color: '#000000',
           background_color: '#000000',
           icons: [
             {
