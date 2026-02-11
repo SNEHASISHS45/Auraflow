@@ -53,6 +53,11 @@ const App: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
+  const refreshWallpapers = useCallback(async () => {
+    const items = await dbService.getAllWallpapers();
+    setWallpapers(items);
+  }, []);
+
   const handleLike = useCallback((id: string) => {
     setLikedIds(prev => {
       const next = prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
@@ -127,16 +132,11 @@ const App: React.FC = () => {
 
     refreshWallpapers();
     return () => unsubAuth();
-  }, []);
+  }, [refreshWallpapers]);
 
   const navigateToTab = (tab: AppTab) => {
     soundService.playTap();
     navigate(`/${tab === AppTab.HOME ? '' : tab}`);
-  };
-
-  const refreshWallpapers = async () => {
-    const items = await dbService.getAllWallpapers();
-    setWallpapers(items);
   };
 
   if (isLoading) return (
