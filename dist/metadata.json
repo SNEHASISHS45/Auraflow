@@ -1,7 +1,0 @@
-{
-  "name": "AuraFlow: Live Wallpaper Community",
-  "description": "A high-end, community-driven platform for discoverable and AI-remixable live wallpapers. Features AR previews, mood-based discovery, and deep creator analytics.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}

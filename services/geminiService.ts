@@ -113,6 +113,58 @@ const tagSuggestions: Record<string, string[]> = {
   flower: ['Nature', 'Floral', 'Colorful', 'Spring']
 };
 
+// ─── Local Aesthetic Fingerprints ────────────────────────────────────────────
+
+const AESTHETIC_PRESETS: Record<string, {
+  tags: string[],
+  prefixes: string[],
+  suffixes: string[],
+  category: string
+}> = {
+  CYBERPUNK: {
+    tags: ['Cyberpunk', 'Neon', 'Futuristic', 'Night', 'Vibrant'],
+    prefixes: ['Neon', 'Synth', 'Cyber', 'Pulse', 'Techno', 'Chrome'],
+    suffixes: ['City', 'Drift', 'Core', 'Link', 'Phase', 'Shard'],
+    category: 'Cinema'
+  },
+  OCEANIC: {
+    tags: ['Ocean', 'Marine', 'Blue', 'Deep', 'Liquid', 'Calm'],
+    prefixes: ['Azure', 'Deep', 'Sapphire', 'Aquatic', 'Coastal', 'Tidal'],
+    suffixes: ['Abyss', 'Current', 'Tide', 'Drift', 'Flow', 'Mist'],
+    category: 'Nature'
+  },
+  VERDANT: {
+    tags: ['Nature', 'Forest', 'Organic', 'Green', 'Fresh', 'Spring'],
+    prefixes: ['Emerald', 'Leafy', 'Floral', 'Wild', 'Verdant', 'Ivy'],
+    suffixes: ['Grove', 'Moss', 'Bloom', 'Peak', 'Glade', 'Root'],
+    category: 'Nature'
+  },
+  ARCTIC: {
+    tags: ['Snow', 'Winter', 'Cold', 'White', 'Ice', 'Frost'],
+    prefixes: ['Glacial', 'Frozen', 'Arctic', 'Polar', 'Silver', 'Crystal'],
+    suffixes: ['Drift', 'Glow', 'Ice', 'Peak', 'Mist', 'Void'],
+    category: 'Nature'
+  },
+  SOLAR: {
+    tags: ['Warm', 'Sunset', 'Golden', 'Dusk', 'Energy', 'Fire'],
+    prefixes: ['Golden', 'Amber', 'Solar', 'Radiant', 'Crimson', 'Eternal'],
+    suffixes: ['Dusk', 'Glow', 'Flare', 'Rise', 'Horizon', 'Ray'],
+    category: 'Nature'
+  },
+  MONOCHROME: {
+    tags: ['B&W', 'Minimal', 'Classic', 'Photography', 'Graphic'],
+    prefixes: ['Silent', 'Dark', 'Classic', 'Steel', 'Iron', 'Shadow'],
+    suffixes: ['Void', 'Lines', 'Form', 'Edge', 'Contrast', 'Still'],
+    category: 'Minimal'
+  },
+  COSMIC: {
+    tags: ['Space', 'Galaxy', 'Stars', 'Nebula', 'Celestial'],
+    prefixes: ['Star', 'Cosmic', 'Nebula', 'Galactic', 'Astral', 'Void'],
+    suffixes: ['Dust', 'Nova', 'Cluster', 'Belt', 'Orbit', 'System'],
+    category: 'Space'
+  }
+};
+
 // ─── Helper: Convert base64 to Gemini inline data ───────────────────────────
 
 function toInlineData(base64Image: string) {
@@ -175,20 +227,7 @@ Return ONLY valid JSON, no markdown.`
     }
 
     // Fallback: local pixel analysis
-    const tags = await this.analyzeImageLocally(base64Image);
-    return {
-      title: 'Untitled Aura',
-      description: insightTemplates[Math.floor(Math.random() * insightTemplates.length)],
-      tags: tags.length >= 3 ? tags : [...tags, 'Abstract', 'Digital Art', 'Wallpaper'],
-      colors: [
-        { name: 'Primary', hex: '#6750A4' },
-        { name: 'Secondary', hex: '#958DA5' },
-        { name: 'Accent', hex: '#D0BCFF' }
-      ],
-      mood: 'Aesthetic',
-      category: 'Abstract',
-      objects: ['Digital Art']
-    };
+    return this.analyzeImageLocally(base64Image);
   },
 
   // ── Lens Description (for Detail page) ────────────────────────────────────
@@ -231,17 +270,14 @@ Return ONLY valid JSON, no markdown.`
       }
     }
 
-    // Fallback
+    // Fallback using local analysis
+    const local = await this.analyzeImageLocally(imageUrl.startsWith('data:') ? imageUrl : ''); // Assuming we might not have base64 here if it failed to fetch
     return {
-      description: "A visually striking composition with thoughtful use of color and form.",
-      colors: [
-        { name: 'Primary', hex: '#6750A4' },
-        { name: 'Accent', hex: '#D0BCFF' },
-        { name: 'Dark', hex: '#000000' }
-      ],
-      objects: ['Digital Art', 'Composition'],
-      style: 'Modern Digital',
-      searchTerms: ['wallpaper', 'aesthetic', 'digital art']
+      description: local.description,
+      colors: local.colors,
+      objects: local.objects,
+      style: local.category + ' Art',
+      searchTerms: local.tags
     };
   },
 
@@ -332,11 +368,8 @@ Return ONLY valid JSON, no markdown.`
 
     // Fallback: local pixel analysis
     try {
-      const tags = await this.analyzeImageLocally(base64Image);
-      if (tags.length < 3) {
-        return [...tags, 'Abstract', 'Digital Art', 'Wallpaper'];
-      }
-      return tags;
+      const analysis = await this.analyzeImageLocally(base64Image);
+      return analysis.tags;
     } catch (error) {
       console.error('Local image analysis failed:', error);
       return ['Abstract', 'Digital Art', 'Wallpaper', 'Aesthetic', 'Modern'];
@@ -344,8 +377,18 @@ Return ONLY valid JSON, no markdown.`
   },
 
   // ── Local Pixel Analysis (canvas fallback) ────────────────────────────────
-  async analyzeImageLocally(base64Image: string): Promise<string[]> {
-    if (typeof window === 'undefined') return [];
+  async analyzeImageLocally(base64Image: string): Promise<ImageAnalysis> {
+    const defaultResult: ImageAnalysis = {
+      title: 'Aura Composition',
+      description: insightTemplates[Math.floor(Math.random() * insightTemplates.length)],
+      tags: ['Abstract', 'Digital Art', 'Wallpaper'],
+      colors: [{ name: 'Deep Purple', hex: '#6750A4' }],
+      mood: 'Aesthetic',
+      category: 'Abstract',
+      objects: ['Digital Art']
+    };
+
+    if (typeof window === 'undefined' || !base64Image) return defaultResult;
 
     return new Promise((resolve) => {
       const img = new Image();
@@ -354,9 +397,9 @@ Return ONLY valid JSON, no markdown.`
         try {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (!ctx) { resolve([]); return; }
+          if (!ctx) { resolve(defaultResult); return; }
 
-          const size = 50;
+          const size = 64; // Slightly larger for better heuristics
           canvas.width = size;
           canvas.height = size;
           ctx.drawImage(img, 0, 0, size, size);
@@ -366,12 +409,19 @@ Return ONLY valid JSON, no markdown.`
 
           let totalBrightness = 0;
           let totalSaturation = 0;
-          const colorBuckets: Record<string, number> = {};
+          const colorBuckets: Record<string, { count: number, hex: string }> = {};
+
+          // Heuristic counters
+          let highContrastCount = 0;
+          let amoledBlackCount = 0;
 
           for (let i = 0; i < data.length; i += 4) {
             const r = data[i], g = data[i + 1], b = data[i + 2];
-            const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+            const brightness = luminance / 255;
             totalBrightness += brightness;
+
+            if (luminance < 10) amoledBlackCount++;
 
             const max = Math.max(r, g, b);
             const min = Math.min(r, g, b);
@@ -379,7 +429,11 @@ Return ONLY valid JSON, no markdown.`
             const saturation = max === 0 ? 0 : delta / max;
             totalSaturation += saturation;
 
-            if (saturation > 0.15 && brightness > 0.1) {
+            if (delta > 120) highContrastCount++;
+
+            const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+
+            if (saturation > 0.1 || brightness > 0.05) {
               let hue = 0;
               if (delta === 0) hue = 0;
               else if (max === r) hue = ((g - b) / delta) % 6;
@@ -389,16 +443,19 @@ Return ONLY valid JSON, no markdown.`
               if (hue < 0) hue += 360;
 
               let colorName = '';
-              if (hue >= 345 || hue < 15) colorName = 'Red';
-              else if (hue >= 15 && hue < 45) colorName = 'Orange';
-              else if (hue >= 45 && hue < 75) colorName = 'Yellow';
-              else if (hue >= 75 && hue < 160) colorName = 'Green';
+              if (hue >= 345 || hue < 20) colorName = 'Red';
+              else if (hue >= 20 && hue < 45) colorName = 'Orange';
+              else if (hue >= 45 && hue < 70) colorName = 'Yellow';
+              else if (hue >= 70 && hue < 160) colorName = 'Green';
               else if (hue >= 160 && hue < 200) colorName = 'Cyan';
-              else if (hue >= 200 && hue < 260) colorName = 'Blue';
-              else if (hue >= 260 && hue < 290) colorName = 'Purple';
-              else if (hue >= 290 && hue < 345) colorName = 'Pink';
+              else if (hue >= 200 && hue < 265) colorName = 'Blue';
+              else if (hue >= 265 && hue < 295) colorName = 'Purple';
+              else if (hue >= 295 && hue < 345) colorName = 'Pink';
 
-              if (colorName) colorBuckets[colorName] = (colorBuckets[colorName] || 0) + 1;
+              if (colorName) {
+                if (!colorBuckets[colorName]) colorBuckets[colorName] = { count: 0, hex };
+                colorBuckets[colorName].count++;
+              }
             }
           }
 
@@ -407,37 +464,73 @@ Return ONLY valid JSON, no markdown.`
           const avgSaturation = totalSaturation / pixelCount;
           const tags = new Set<string>();
 
-          if (avgBrightness < 0.25) tags.add('Dark');
-          else if (avgBrightness < 0.4) tags.add('Moody');
-          else if (avgBrightness > 0.75) tags.add('Bright');
-          else if (avgBrightness > 0.6) tags.add('Light');
+          // --- Style Selection Fingerprinting ---
+          let styleKey = 'MONOCHROME';
+          const rAmount = colorBuckets['Red']?.count || 0;
+          const bAmount = colorBuckets['Blue']?.count || 0;
+          const cAmount = colorBuckets['Cyan']?.count || 0;
+          const pAmount = colorBuckets['Purple']?.count || 0;
+          const gAmount = colorBuckets['Green']?.count || 0;
+          const yAmount = colorBuckets['Yellow']?.count || 0;
+          const oAmount = colorBuckets['Orange']?.count || 0;
 
-          if (avgSaturation > 0.5) { tags.add('Vibrant'); tags.add('Colorful'); }
-          else if (avgSaturation < 0.1) { tags.add('Monochrome'); tags.add('Minimal'); }
-          else if (avgSaturation < 0.25) tags.add('Muted');
+          if (amoledBlackCount > pixelCount * 0.4 && (pAmount + rAmount + cAmount) > pixelCount * 0.1) {
+            styleKey = 'CYBERPUNK';
+          } else if (gAmount > pixelCount * 0.25) {
+            styleKey = 'VERDANT';
+          } else if (cAmount + bAmount > pixelCount * 0.3) {
+            styleKey = 'OCEANIC';
+          } else if (amoledBlackCount > pixelCount * 0.3 && avgSaturation < 0.2) {
+            styleKey = 'COSMIC';
+          } else if (yAmount + oAmount + rAmount > pixelCount * 0.3) {
+            styleKey = 'SOLAR';
+          } else if (avgBrightness > 0.8 && avgSaturation < 0.1) {
+            styleKey = 'ARCTIC';
+          } else if (avgSaturation < 0.1) {
+            styleKey = 'MONOCHROME';
+          } else {
+            // Default to a mixed abstract style
+            styleKey = avgBrightness < 0.4 ? 'COSMIC' : 'SOLAR';
+          }
+
+          const aesthetic = AESTHETIC_PRESETS[styleKey];
+          aesthetic.tags.forEach(t => tags.add(t));
+
+          if (avgBrightness < 0.2) tags.add('Dark Mode');
+          if (highContrastCount > pixelCount * 0.2) tags.add('High-Contrast');
+          if (avgSaturation > 0.6) tags.add('Vibrant');
 
           const sortedColors = Object.entries(colorBuckets)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 2)
-            .map(([color]) => color);
-          sortedColors.forEach(c => tags.add(c));
+            .sort(([, a], [, b]) => b.count - a.count)
+            .slice(0, 4);
 
-          resolve(Array.from(tags));
+          sortedColors.forEach(([name]) => tags.add(name));
+
+          const finalColors = sortedColors.map(([name, data]) => ({ name, hex: data.hex }));
+          if (finalColors.length === 0) finalColors.push({ name: 'Primary', hex: '#6750A4' });
+
+          // Smart Naming
+          const pre = aesthetic.prefixes[Math.floor(Math.random() * aesthetic.prefixes.length)];
+          const suf = aesthetic.suffixes[Math.floor(Math.random() * aesthetic.suffixes.length)];
+          const title = `${pre} ${suf} Aura`;
+
+          resolve({
+            title,
+            description: insightTemplates[Math.floor(Math.random() * insightTemplates.length)],
+            tags: Array.from(tags).slice(0, 10),
+            colors: finalColors,
+            mood: avgBrightness > 0.6 ? 'Ethereal' : avgBrightness < 0.3 ? 'Nocturnal' : 'Dynamic',
+            category: aesthetic.category,
+            objects: [aesthetic.category, styleKey.toLowerCase().replace(/^\w/, c => c.toUpperCase())]
+          });
         } catch (e) {
-          console.error("Analysis error", e);
-          resolve([]);
+          console.error("Local Heuristic error", e);
+          resolve(defaultResult);
         }
       };
 
-      img.onerror = () => { resolve([]); };
-
-      let src = base64Image;
-      if (!base64Image.startsWith('data:')) {
-        const isPng = base64Image.trim().startsWith('iV');
-        const mime = isPng ? 'image/png' : 'image/jpeg';
-        src = `data:${mime};base64,${base64Image}`;
-      }
-      img.src = src;
+      img.onerror = () => { resolve(defaultResult); };
+      img.src = base64Image;
     });
   },
 

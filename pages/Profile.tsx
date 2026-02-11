@@ -7,6 +7,8 @@ import { dbService } from '../services/dbService';
 import { WallpaperSkeleton, Skeleton } from '../components/Skeleton';
 import { AnimateIcon } from '../components/ui/AnimateIcon';
 import { UserIcon, EyeIcon, EyeOffIcon, EditIcon, TrashIcon, ChevronRightIcon, LogoutIcon, XIcon, LockIcon } from '../components/ui/Icons';
+import { Masonry } from '../components/ui/Masonry';
+import { WallpaperItem } from '../services/pexelsService';
 
 interface ProfileProps {
   currentUser: User | null;
@@ -153,64 +155,77 @@ export const Profile: React.FC<ProfileProps> = ({ currentUser, onUserUpdate, onS
 
       {activeSubTab === 'uploads' ? (
         <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="w-full">
             {loading ? (
-              [...Array(6)].map((_, i) => (
-                <WallpaperSkeleton key={i} />
-              ))
+              <Masonry<{ id: number }>
+                items={Array.from({ length: 3 }).map((_, i) => ({ id: i }))}
+                gap={8}
+                renderItem={(item) => (
+                  <WallpaperSkeleton key={item.id} />
+                )}
+              />
             ) : userWallpapers.length > 0 ? (
-              userWallpapers.map((wp: any) => (
-                <motion.div
-                  key={wp.id}
-                  layoutId={wp.id}
-                  className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/5 bg-white/5 group relative"
-                >
-                  <img src={wp.url} className="w-full h-full object-cover transition-transform group-hover:scale-110" alt={wp.title} />
+              <Masonry<any>
+                items={userWallpapers}
+                gap={8}
+                renderItem={(wp: any) => (
+                  <motion.div
+                    key={wp.id}
+                    layoutId={wp.id}
+                  >
+                    <div
+                      className="pin-card group"
+                      style={{ aspectRatio: wp.width && wp.height ? `${wp.width}/${wp.height}` : '3/4' }}
+                    >
+                      <img src={wp.url} className="w-full h-full object-cover" alt={wp.title} />
+                      <div className="pin-overlay" />
 
-                  {/* Visibility Badge */}
-                  {wp.visibility === 'private' && (
-                    <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg flex items-center gap-1.5 border border-white/10">
-                      <AnimateIcon animation="default">
-                        <LockIcon size={10} className="text-white/60" />
-                      </AnimateIcon>
-                      <span className="text-[8px] font-black uppercase tracking-widest text-white/60">Private</span>
+                      {/* Visibility Badge */}
+                      {wp.visibility === 'private' && (
+                        <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-xl flex items-center gap-1.5 border border-white/10 z-10">
+                          <AnimateIcon animation="default">
+                            <LockIcon size={10} className="text-white/60" />
+                          </AnimateIcon>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-white/60">Private</span>
+                        </div>
+                      )}
+
+                      {/* Hover actions */}
+                      <div className="pin-actions absolute inset-0 z-10 p-3 flex flex-col justify-end">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleToggleVisibility(wp)}
+                            className="flex-1 h-9 rounded-xl bg-black/40 backdrop-blur-md hover:bg-black/60 border border-white/10 flex items-center justify-center transition-colors"
+                            title={wp.visibility === 'private' ? 'Make Public' : 'Make Private'}
+                          >
+                            <AnimateIcon animation="default">
+                              {wp.visibility === 'private' ? <EyeIcon size={14} /> : <EyeOffIcon size={14} />}
+                            </AnimateIcon>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(wp.id)}
+                            className="flex-1 h-9 rounded-xl bg-red-500/30 hover:bg-red-500/50 text-red-400 flex items-center justify-center transition-colors"
+                          >
+                            <AnimateIcon animation="default">
+                              <TrashIcon size={14} />
+                            </AnimateIcon>
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  )}
-
-                  {/* Actions Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
-                    <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-4">{wp.title}</p>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleToggleVisibility(wp)}
-                        className="flex-1 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                        title={wp.visibility === 'private' ? 'Make Public' : 'Make Private'}
-                      >
-                        <AnimateIcon animation="default">
-                          {wp.visibility === 'private' ? <EyeIcon size={14} /> : <EyeOffIcon size={14} />}
-                        </AnimateIcon>
-                      </button>
+                    {/* Always-visible metadata */}
+                    <div className="pin-meta">
+                      <h3 className="text-on-surface">{wp.title}</h3>
                       <button
                         onClick={() => setEditingItem(wp)}
-                        className="flex-1 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                        className="text-[11px] font-medium text-primary hover:underline"
                       >
-                        <AnimateIcon animation="default">
-                          <EditIcon size={14} />
-                        </AnimateIcon>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(wp.id)}
-                        className="flex-1 h-10 rounded-xl bg-red-500/20 hover:bg-red-500/40 text-red-400 flex items-center justify-center transition-colors"
-                      >
-                        <AnimateIcon animation="default">
-                          <TrashIcon size={14} />
-                        </AnimateIcon>
+                        Edit Aura
                       </button>
                     </div>
-                  </div>
-                </motion.div>
-              ))
+                  </motion.div>
+                )}
+              />
             ) : (
               <div className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-3xl">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">No originals published yet</p>

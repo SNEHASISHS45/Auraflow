@@ -7,6 +7,7 @@ import { Skeleton } from '../components/Skeleton';
 import { useState } from 'react';
 import { AnimateIcon } from '../components/ui/AnimateIcon';
 import { BookmarkIcon } from '../components/ui/Icons';
+import { Masonry } from '../components/ui/Masonry';
 
 interface SavedProps {
   onSelect: (w: Wallpaper) => void;
@@ -34,35 +35,38 @@ export const Saved: React.FC<SavedProps> = ({ onSelect, savedIds, wallpapers }) 
       </div>
 
       {savedItems.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4">
-          {savedItems.map((wp, i) => {
-            const [imageLoaded, setImageLoaded] = useState(false);
-            return (
-              <motion.div
-                key={wp.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => { soundService.playTap(); onSelect(wp); }}
-                className="group relative aspect-[3/4.5] rounded-[24px] overflow-hidden border border-white/5 bg-surface-dark cursor-pointer active:scale-95 transition-transform"
+        <Masonry<Wallpaper>
+          items={savedItems}
+          gap={8}
+          renderItem={(wp) => (
+            <motion.div
+              key={wp.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              onClick={() => { soundService.playTap(); onSelect(wp); }}
+            >
+              <div
+                className="pin-card"
+                style={{
+                  aspectRatio: wp.width && wp.height ? `${wp.width}/${wp.height}` : '3/4'
+                }}
               >
-                {!imageLoaded && <Skeleton className="absolute inset-0 rounded-none w-full h-full" />}
                 <img
                   src={wp.url}
-                  onLoad={() => setImageLoaded(true)}
-                  className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  className="w-full h-full object-cover"
                   alt={wp.title}
+                  loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-4 flex flex-col justify-end">
-                  <p className="text-xs font-bold truncate mb-1">{wp.title}</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-[10px] text-white/40 truncate">by {wp.author.split(' ')[0]}</p>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
+                <div className="pin-overlay" />
+              </div>
+              <div className="pin-meta">
+                <h3 className="text-on-surface">{wp.title}</h3>
+                <p className="text-on-surface-variant text-xs truncate">{wp.author}</p>
+              </div>
+            </motion.div>
+          )}
+        />
       ) : (
         <div className="flex flex-col items-center justify-center py-32 text-center">
           <motion.div

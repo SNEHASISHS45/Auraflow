@@ -7,6 +7,7 @@ import { Skeleton } from '../components/Skeleton';
 import { Wallpaper } from '../types';
 import { AnimateIcon } from '../components/ui/AnimateIcon';
 import { Search, X, TrendingUp, Sparkles, Play, Image, Film, Clock, Zap } from 'lucide-react';
+import { Masonry } from '../components/ui/Masonry';
 
 interface ExploreProps {
   onSelect: (wp: Wallpaper) => void;
@@ -24,7 +25,9 @@ const toWallpaper = (item: WallpaperItem): Wallpaper => ({
   views: item.views,
   downloads: item.downloads,
   likes: item.likes,
-  videoUrl: item.videoUrl
+  videoUrl: item.videoUrl,
+  width: item.width,
+  height: item.height
 });
 
 type SearchFilter = 'all' | 'photos' | 'videos' | 'anime';
@@ -248,51 +251,68 @@ export const Explore: React.FC<ExploreProps> = ({ onSelect }) => {
             </div>
 
             {isSearching && searchResults.length === 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <div key={i} className="aspect-[3/4] rounded-3xl overflow-hidden">
-                    <Skeleton className="w-full h-full" />
+              <Masonry<{ id: number }>
+                items={Array.from({ length: 10 }).map((_, i) => ({ id: i }))}
+                gap={8}
+                renderItem={(item) => (
+                  <div key={item.id} className="rounded-2xl overflow-hidden">
+                    <Skeleton className="w-full" style={{ aspectRatio: item.id % 2 === 0 ? '3/4' : '9/16' }} />
                   </div>
-                ))}
-              </div>
+                )}
+              />
             ) : searchResults.length > 0 ? (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
-                  {searchResults.map((item, i) => (
+                <Masonry<WallpaperItem>
+                  items={searchResults}
+                  gap={8}
+                  renderItem={(item, i) => (
                     <motion.div
                       key={`${item.id}-${i}`}
-                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 25, delay: (i % 10) * 0.03 }}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 30, delay: (i % 10) * 0.03 }}
                       onClick={() => { soundService.playTap(); onSelect(toWallpaper(item)); }}
-                      className="aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer group relative border border-outline/10 transition-all hover:border-primary/30 shadow-1 hover:shadow-3"
-                      style={{ backgroundColor: item.avgColor || '#1a1a1a' }}
                     >
-                      <img
-                        src={item.thumbnailUrl}
-                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                        alt={item.title}
-                        loading="lazy"
-                      />
-                      {item.type === 'video' && item.videoUrl && (
-                        <div className="absolute top-4 right-4 size-8 bg-surface/60 backdrop-blur-md rounded-full flex items-center justify-center border border-outline/20">
-                          <Play size={12} className="text-on-surface fill-on-surface ml-0.5" />
+                      <div
+                        className="pin-card"
+                        style={{
+                          backgroundColor: item.avgColor || '#1a1a1a',
+                          aspectRatio: item.width && item.height ? `${item.width}/${item.height}` : '3/4'
+                        }}
+                      >
+                        <img
+                          src={item.thumbnailUrl}
+                          className="w-full h-full object-cover"
+                          alt={item.title}
+                          loading="lazy"
+                        />
+                        <div className="pin-overlay" />
+                        {item.type === 'video' && item.videoUrl && (
+                          <div className="absolute top-3 left-3 size-7 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center z-10">
+                            <Play size={12} className="text-white fill-white ml-0.5" />
+                          </div>
+                        )}
+                        {/* Source badge on hover */}
+                        <div className="pin-actions absolute inset-0 z-10 p-3 flex flex-col justify-between">
+                          <div className="flex justify-between items-start">
+                            <span className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider backdrop-blur-md border border-white/10 ${item.id.startsWith('wallhaven')
+                              ? 'bg-primary/80 text-on-primary'
+                              : 'bg-secondary/80 text-on-secondary'
+                              }`}>
+                              {item.id.startsWith('wallhaven') ? 'Wallhaven' : 'Pexels'}
+                            </span>
+                          </div>
+                          <div />
                         </div>
-                      )}
-                      {/* Source badge */}
-                      <div className={`absolute top-4 left-4 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 ${item.id.startsWith('wallhaven')
-                        ? 'bg-primary/80 text-on-primary'
-                        : 'bg-secondary/80 text-on-secondary'
-                        }`}>
-                        {item.id.startsWith('wallhaven') ? 'Wallhaven' : 'Pexels'}
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-                        <p className="text-on-surface text-[10px] font-black uppercase tracking-widest truncate">{item.author}</p>
+                      {/* Always-visible metadata */}
+                      <div className="pin-meta">
+                        <h3 className="text-on-surface">{item.title}</h3>
+                        <p className="text-on-surface-variant text-xs truncate">{item.author}</p>
                       </div>
                     </motion.div>
-                  ))}
-                </div>
+                  )}
+                />
 
                 {/* Load more indicator */}
                 <div ref={loaderRef} className="py-12 flex items-center justify-center">
@@ -396,27 +416,31 @@ export const Explore: React.FC<ExploreProps> = ({ onSelect }) => {
                 <Image size={18} className="text-primary" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-on-surface">Browse Categories</h3>
               </div>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                {Object.entries(categoryImages).map(([name, image], idx) => (
+              <Masonry<{ name: string; image: string; id: string }>
+                items={Object.entries(categoryImages).map(([name, image]) => ({ name, image, id: name }))}
+                gap={16}
+                columns={{ 640: 2, 1024: 3 }}
+                renderItem={(item, idx) => (
                   <motion.div
-                    key={name}
+                    key={item.name}
                     whileHover={{ scale: 0.98, y: -2 }}
                     whileTap={{ scale: 0.96 }}
-                    className={`relative overflow-hidden rounded-[32px] cursor-pointer group h-32 lg:h-44 border border-outline/10 shadow-1 hover:shadow-2 ${idx === 0 ? 'md:col-span-2' : ''}`}
-                    onClick={() => handleSearch(name)}
+                    className={`relative overflow-hidden rounded-[32px] cursor-pointer group border border-outline/10 shadow-1 hover:shadow-2 w-full`}
+                    style={{ height: idx === 0 ? '240px' : idx % 3 === 0 ? '280px' : '180px' }}
+                    onClick={() => handleSearch(item.name)}
                   >
                     <img
-                      src={image}
+                      src={item.image}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                      alt={name}
+                      alt={item.name}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-surface/90 via-surface/30 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-6">
-                      <h4 className="text-on-surface font-black text-xl uppercase tracking-tighter">{name}</h4>
+                      <h4 className="text-on-surface font-black text-xl uppercase tracking-tighter">{item.name}</h4>
                     </div>
                   </motion.div>
-                ))}
-              </div>
+                )}
+              />
             </section>
           </motion.div>
         )}

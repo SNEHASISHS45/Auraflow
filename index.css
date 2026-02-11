@@ -172,6 +172,73 @@ body {
   scrollbar-width: none;
 }
 
+/* Pinterest Mercury Pin Card */
+.pin-card {
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  position: relative;
+}
+
+.pin-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.pin-card img,
+.pin-card video {
+  transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.pin-card:hover img,
+.pin-card:hover video {
+  transform: scale(1.04);
+}
+
+.pin-card .pin-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.3s ease;
+  pointer-events: none;
+}
+
+.pin-card:hover .pin-overlay {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.pin-card .pin-actions {
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+.pin-card:hover .pin-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pin-meta {
+  padding: 8px 4px 4px;
+}
+
+.pin-meta h3 {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.pin-meta p {
+  font-size: 12px;
+  margin: 2px 0 0;
+  opacity: 0.6;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

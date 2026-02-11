@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Masonry } from './ui/Masonry';
 
 interface SkeletonProps {
     className?: string;
@@ -56,11 +57,19 @@ export const ProfileSkeleton: React.FC = () => {
                     </div>
                 </div>
             </header>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {[...Array(10)].map((_, i) => (
-                    <WallpaperSkeleton key={i} />
-                ))}
-            </div>
+            <Masonry<{ id: number }>
+                items={Array.from({ length: 15 }).map((_, i) => ({ id: i }))}
+                gap={16}
+                renderItem={(item) => (
+                    <div className="space-y-3">
+                        <Skeleton className="w-full rounded-3xl" style={{ aspectRatio: item.id % 2 === 0 ? '3/4' : '9/16' }} />
+                        <div className="px-2 space-y-2">
+                            <Skeleton className="h-3 w-2/3 rounded-full opacity-50" />
+                            <Skeleton className="h-2 w-1/3 rounded-full opacity-30" />
+                        </div>
+                    </div>
+                )}
+            />
         </div>
     );
 };

@@ -35,6 +35,8 @@ export interface Wallpaper {
   aiObjects?: string[];
   aiStyle?: string;
   aiSearchTerms?: string[];
+  width?: number;
+  height?: number;
 }
 
 export interface Collection {

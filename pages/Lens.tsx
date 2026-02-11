@@ -10,6 +10,7 @@ import { Skeleton } from '../components/Skeleton';
 import { AnimateIcon } from '../components/ui/AnimateIcon';
 import { LensIcon, ArrowLeftIcon, SparklesIcon } from '../components/ui/Icons';
 import { Camera, Upload, X, Search, Play } from 'lucide-react';
+import { Masonry } from '../components/ui/Masonry';
 
 interface LensProps {
     onSelect: (wp: Wallpaper) => void;
@@ -28,7 +29,9 @@ const toWallpaper = (item: WallpaperItem): Wallpaper => ({
     views: item.views,
     downloads: item.downloads,
     likes: item.likes,
-    videoUrl: item.videoUrl
+    videoUrl: item.videoUrl,
+    width: item.width,
+    height: item.height
 });
 
 export const Lens: React.FC<LensProps> = ({ onSelect }) => {
@@ -352,16 +355,21 @@ export const Lens: React.FC<LensProps> = ({ onSelect }) => {
                             </div>
 
                             {results.length > 0 ? (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
-                                    {results.map((item, i) => (
+                                <Masonry<WallpaperItem>
+                                    items={results}
+                                    gap={16}
+                                    renderItem={(item, i) => (
                                         <motion.div
                                             key={`${item.id}-${i}`}
                                             initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                             animate={{ opacity: 1, scale: 1, y: 0 }}
                                             transition={{ type: 'spring', stiffness: 300, damping: 25, delay: (i % 10) * 0.03 }}
                                             onClick={() => { soundService.playTap(); onSelect(toWallpaper(item)); }}
-                                            className="aspect-[3/4] rounded-3xl overflow-hidden cursor-pointer group relative border border-outline/10 transition-all hover:border-primary/30 shadow-1 hover:shadow-3"
-                                            style={{ backgroundColor: item.avgColor || '#1a1a1a' }}
+                                            className="rounded-3xl overflow-hidden cursor-pointer group relative border border-outline/10 transition-all hover:border-primary/30 shadow-1 hover:shadow-3"
+                                            style={{
+                                                backgroundColor: item.avgColor || '#1a1a1a',
+                                                aspectRatio: item.width && item.height ? `${item.width}/${item.height}` : '3/4'
+                                            }}
                                         >
                                             <img
                                                 src={item.thumbnailUrl}
@@ -382,8 +390,8 @@ export const Lens: React.FC<LensProps> = ({ onSelect }) => {
                                                 <p className="text-on-surface text-[10px] font-black uppercase tracking-widest truncate">{item.author}</p>
                                             </div>
                                         </motion.div>
-                                    ))}
-                                </div>
+                                    )}
+                                />
                             ) : (
                                 <div className="py-20 text-center">
                                     <p className="text-on-surface-variant mb-2">No matching wallpapers found</p>

@@ -5,9 +5,8 @@ import { soundService } from '../services/soundService';
 import { pexelsService, WallpaperItem } from '../services/pexelsService';
 import { wallhavenService, WallhavenItem } from '../services/wallhavenService';
 import { Skeleton } from '../components/Skeleton';
-import { AnimateIcon } from '../components/ui/AnimateIcon';
-import { HeartIcon } from '../components/ui/Icons';
-import { Play, RefreshCw } from 'lucide-react';
+import { Play } from 'lucide-react';
+import { Masonry } from '../components/ui/Masonry';
 
 interface HomeProps {
   onSelect: (w: Wallpaper) => void;
@@ -29,7 +28,9 @@ const toWallpaper = (item: WallpaperItem): Wallpaper => ({
   views: item.views,
   downloads: item.downloads,
   likes: item.likes,
-  videoUrl: item.videoUrl
+  videoUrl: item.videoUrl,
+  width: item.width,
+  height: item.height
 });
 
 const WallpaperCard = React.memo(({
@@ -45,7 +46,6 @@ const WallpaperCard = React.memo(({
   isLiked: boolean;
   index: number;
 }) => {
-  // Memoize the wallpaper object so it doesn't change on every render
   const wp = useMemo(() => toWallpaper(item), [item]);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -53,7 +53,6 @@ const WallpaperCard = React.memo(({
 
   const isVideo = item.type === 'video' && item.videoUrl;
 
-  // Play/pause video on hover
   useEffect(() => {
     if (isVideo && videoRef.current) {
       if (isHovered) {
@@ -67,26 +66,26 @@ const WallpaperCard = React.memo(({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9, y: 20 }}
-      whileInView={{ opacity: 1, scale: 1, y: 0 }}
-      whileHover={{ y: -5 }}
-      whileTap={{ scale: 0.96 }}
+      initial={{ opacity: 0, y: 15 }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25, delay: (index % 5) * 0.05 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30, delay: (index % 6) * 0.04 }}
       onClick={() => onSelect(wp)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group cursor-pointer"
     >
+      {/* Pin Image Container */}
       <div
-        className="relative aspect-[3/4] overflow-hidden rounded-3xl bg-surface-variant/20 border border-outline/10 transition-all group-hover:border-primary/30 group-hover:shadow-3 group-active:scale-95"
-        style={{ backgroundColor: item.avgColor || undefined }}
+        className="pin-card"
+        style={{
+          backgroundColor: item.avgColor || '#1a1a1a',
+          aspectRatio: wp.width && wp.height ? `${wp.width}/${wp.height}` : '3/4'
+        }}
       >
         {!imageLoaded && (
           <Skeleton className="absolute inset-0 rounded-none w-full h-full" />
         )}
 
-        {/* Video preview on hover */}
         {isVideo && isHovered ? (
           <video
             ref={videoRef}
@@ -100,42 +99,49 @@ const WallpaperCard = React.memo(({
           <img
             src={item.thumbnailUrl || item.url}
             onLoad={() => setImageLoaded(true)}
-            className={`w-full h-full object-cover transition-transform duration-1000 ease-out ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-105`}
+            className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             alt={wp.title}
             loading="lazy"
           />
         )}
 
-        {/* Video indicator */}
+        {/* Hover dim overlay */}
+        <div className="pin-overlay" />
+
+        {/* Video indicator badge */}
         {isVideo && (
-          <div className={`absolute top-4 right-4 size-8 bg-surface/60 backdrop-blur-md rounded-full flex items-center justify-center border border-outline/20 transition-opacity ${isHovered ? 'opacity-0' : 'opacity-100'}`}>
-            <Play size={14} className="text-on-surface fill-on-surface ml-0.5" />
+          <div className="absolute top-3 left-3 size-7 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center z-10">
+            <Play size={12} className="text-white fill-white ml-0.5" />
           </div>
         )}
 
-        {/* Gradient overlay on hover */}
-        <div className="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-        {/* Quick like button on hover */}
-        <button
-          onClick={(e) => onLike(e, wp.id)}
-          className={`absolute bottom-4 right-4 size-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${isLiked
-            ? 'bg-primary text-on-primary'
-            : 'bg-surface/40 text-on-surface hover:bg-surface/60 border border-outline/10'
-            }`}
-        >
-          <AnimateIcon animation={isLiked ? 'default' : 'initial'}>
-            <HeartIcon size={18} className={isLiked ? 'fill-current' : ''} />
-          </AnimateIcon>
-        </button>
+        {/* Hover action buttons */}
+        <div className="pin-actions absolute inset-0 z-10 p-3 flex flex-col justify-between">
+          {/* Top-right: Save pill */}
+          <div className="flex justify-end">
+            <button
+              onClick={(e) => onLike(e, wp.id)}
+              className={`px-4 py-2 rounded-full text-[11px] font-bold transition-colors ${isLiked
+                ? 'bg-primary text-on-primary'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+            >
+              {isLiked ? 'Saved' : 'Save'}
+            </button>
+          </div>
+          {/* Bottom spacer */}
+          <div />
+        </div>
       </div>
 
-      <div className="mt-4 px-2">
-        <h3 className="text-sm font-bold text-on-surface truncate tracking-tight">
-          {wp.title}
-        </h3>
-        <p className="text-[11px] font-medium text-on-surface-variant mt-0.5 uppercase tracking-wider">
-          {wp.author}
+      {/* Always-visible bottom metadata */}
+      <div className="pin-meta">
+        <h3 className="text-on-surface">{wp.title}</h3>
+        <p className="text-on-surface-variant text-xs flex items-center gap-1">
+          {wp.authorAvatar && (
+            <img src={wp.authorAvatar} className="size-5 rounded-full object-cover" alt="" />
+          )}
+          <span className="truncate">{wp.author}</span>
         </p>
       </div>
     </motion.div>
@@ -235,8 +241,8 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
     views: typeof wp.views === 'string' ? parseInt(wp.views) || 0 : wp.views || 0,
     downloads: typeof wp.downloads === 'string' ? parseInt(wp.downloads) || 0 : wp.downloads || 0,
     likes: typeof wp.likes === 'string' ? parseInt(wp.likes) || 0 : wp.likes || 0,
-    width: 1080,
-    height: 1920,
+    width: wp.width || 1080,
+    height: wp.height || 1920,
     videoUrl: wp.videoUrl
   })), [customWallpapers]);
 
@@ -279,23 +285,32 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
         </div>
       </header>
 
-      {/* Loading skeleton for initial load */}
+      {/* Masonry Loading Skeleton */}
       {loading && allItems.length === 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="space-y-3">
-              <Skeleton className="aspect-[3/4] rounded-2xl" />
-              <Skeleton className="h-4 w-3/4 rounded" />
-              <Skeleton className="h-3 w-1/2 rounded" />
+        <Masonry<{ id: number }>
+          items={Array.from({ length: 10 }).map((_, i) => ({ id: i }))}
+          gap={8}
+          renderItem={(item) => (
+            <div key={item.id} className="space-y-3">
+              <Skeleton
+                className="rounded-2xl w-full"
+                style={{ aspectRatio: item.id % 2 === 0 ? '3/4' : '9/16' }}
+              />
+              <div className="px-2 space-y-2">
+                <Skeleton className="h-3 w-2/3 rounded-full opacity-50" />
+                <Skeleton className="h-2 w-1/3 rounded-full opacity-30" />
+              </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
 
-      {/* Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-6">
-        <AnimatePresence>
-          {allItems.map((item, idx) => (
+      {/* Masonry Feed */}
+      <AnimatePresence mode="popLayout">
+        <Masonry<WallpaperItem>
+          items={allItems}
+          gap={8}
+          renderItem={(item, idx) => (
             <WallpaperCard
               key={item.id}
               item={item}
@@ -304,9 +319,9 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
               onLike={toggleLike}
               isLiked={likedIds.includes(item.id)}
             />
-          ))}
-        </AnimatePresence>
-      </div>
+          )}
+        />
+      </AnimatePresence>
 
       {/* Load more indicator */}
       {hasMore && allItems.length > 0 && (

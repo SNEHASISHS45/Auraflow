@@ -5,6 +5,7 @@ import { Wallpaper } from '../types';
 import { soundService } from '../services/soundService';
 import { AnimateIcon } from './ui/AnimateIcon';
 import { ArrowLeftIcon } from './ui/Icons';
+import { Masonry } from './ui/Masonry';
 
 interface SearchOverlayProps {
   wallpapers: Wallpaper[];
@@ -101,20 +102,25 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({ wallpapers, onSele
               </p>
 
               {results.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                  {results.map((wp, i) => (
+                <Masonry<Wallpaper>
+                  items={results}
+                  gap={24}
+                  renderItem={(wp, i) => (
                     <motion.div
-                      key={wp.id}
+                      key={`${wp.id}-${i}`}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
                       onClick={() => { soundService.playTap(); onSelect(wp); }}
-                      className="aspect-[3/4.5] rounded-lg overflow-hidden border border-black/5 dark:border-white/5 bg-surface-light dark:bg-surface-dark group cursor-pointer"
+                      className="rounded-lg overflow-hidden border border-black/5 dark:border-white/5 bg-surface-light dark:bg-surface-dark group cursor-pointer"
+                      style={{
+                        aspectRatio: wp.width && wp.height ? `${wp.width}/${wp.height}` : '3/4.5'
+                      }}
                     >
                       <img src={wp.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="" />
                     </motion.div>
-                  ))}
-                </div>
+                  )}
+                />
               ) : (
                 <div className="py-32 flex flex-col items-center justify-center text-center">
                   <h4 className="text-4xl font-black mb-4 tracking-tighter">No Match Found</h4>

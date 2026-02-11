@@ -27,7 +27,7 @@ interface NavProps {
 
 export const BottomNav: React.FC<NavProps> = ({ activeTab, setActiveTab, currentUser }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] pb-[env(safe-area-inset-bottom)] bg-surface border-t border-outline/10 lg:hidden shadow-3">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] pb-[env(safe-area-inset-bottom)] bg-black border-t border-white/10 lg:hidden shadow-3 dark">
       <div className="flex items-center justify-around h-20 px-2">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -78,7 +78,7 @@ export const Sidebar: React.FC<NavProps> = ({ activeTab, setActiveTab, onNotific
   return (
     <aside className="hidden lg:flex flex-col w-72 h-screen border-r border-outline/10 bg-surface p-8 z-[110]">
       <div className="mb-16 px-4">
-        <h1 className="text-3xl font-black tracking-tighter uppercase text-primary">AuraFlow</h1>
+        <h1 className="text-3xl font-white tracking-tighter uppercase text-primary">AuraFlow</h1>
       </div>
 
       <nav className="flex-1 space-y-4">

@@ -218,7 +218,6 @@ const App: React.FC = () => {
                               authorId: currentUser.id
                             };
                             await dbService.saveWallpaper(wallpaperData);
-                            navigate('/');
                             refreshWallpapers();
                           }
                         }} currentUser={currentUser} onAuthRequired={() => setShowAuth(true)} />

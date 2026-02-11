@@ -31,6 +31,18 @@ const AUTHORS = [
   { name: 'Cyber Spirit', avatar: 'https://i.pravatar.cc/150?u=cyber' }
 ];
 
+// Varied dimensions for a natural-looking masonry grid
+const DIMENSIONS = [
+  { w: 1080, h: 1920 },  // 9:16 portrait (phone)
+  { w: 1080, h: 1350 },  // 4:5 portrait (Instagram)
+  { w: 1000, h: 1800 },  // tall portrait
+  { w: 1080, h: 1440 },  // 3:4 portrait
+  { w: 1920, h: 1080 },  // 16:9 landscape
+  { w: 1080, h: 1080 },  // 1:1 square
+  { w: 1080, h: 1620 },  // 2:3 portrait
+  { w: 1200, h: 1600 },  // 3:4 portrait
+];
+
 const generateWallpapers = (count: number): Wallpaper[] => {
   return Array.from({ length: count }).map((_, i) => {
     const popData = POP_CULTURE_DATA[i % POP_CULTURE_DATA.length];
@@ -38,18 +50,21 @@ const generateWallpapers = (count: number): Wallpaper[] => {
     const author = AUTHORS[i % AUTHORS.length];
     const id = (i + 1).toString();
     const type = i % 3 === 0 ? 'live' : i % 3 === 1 ? 'parallax' : 'static';
-    
+    const dim = DIMENSIONS[i % DIMENSIONS.length];
+
     return {
       id,
-      title: `${title} #${Math.floor(i/5) + 1}`,
+      title: `${title} #${Math.floor(i / 5) + 1}`,
       author: author.name,
       authorAvatar: author.avatar,
-      url: `https://picsum.photos/seed/${(i + 1) * 13}/1000/1800`,
+      url: `https://picsum.photos/seed/${(i + 1) * 13}/${dim.w}/${dim.h}`,
       views: `${(Math.random() * 80 + 10).toFixed(1)}k`,
       downloads: `${(Math.random() * 20 + 2).toFixed(1)}k`,
       likes: Math.floor(Math.random() * 10000).toString(),
       type: type as any,
-      tags: [...popData.tags, popData.category, 'Premium', '4K']
+      tags: [...popData.tags, popData.category, 'Premium', '4K'],
+      width: dim.w,
+      height: dim.h
     };
   });
 };

@@ -8,8 +8,33 @@ import { cloudinaryService } from '../services/cloudinaryService';
 import { Wallpaper, AspectRatio, User } from '../types';
 import { MoodDiscovery } from './MoodDiscovery';
 import { AnimateIcon } from '../components/ui/AnimateIcon';
-import { CloudUploadIcon, BrainIcon, ArrowRightIcon, ArrowLeftIcon, SparklesIcon, XIcon, EyeIcon, EyeOffIcon, LensIcon } from '../components/ui/Icons';
+import {
+  ArrowLeftIcon,
+  SparklesIcon,
+  ArrowRightIcon,
+  CloudUploadIcon,
+  BrainIcon,
+  LensIcon,
+  EyeIcon,
+  EyeOffIcon,
+  XIcon
+} from '../components/ui/Icons';
+import { Masonry } from '../components/ui/Masonry';
 import { useNavigate } from 'react-router-dom';
+
+interface UploadItem {
+  id: string;
+  file: File;
+  previewUrl: string;
+  status: 'pending' | 'analyzing' | 'ready' | 'publishing' | 'success' | 'error';
+  title: string;
+  tags: string[];
+  aiAnalysis: ImageAnalysis | null;
+  cloudinaryUrl?: string;
+  progress: number;
+  width?: number;
+  height?: number;
+}
 
 interface UploadProps {
   onUploadSuccess: (wp: Wallpaper) => void;
@@ -22,10 +47,7 @@ type StudioMode = 'choice' | 'upload' | 'ai-lab' | 'analyzing' | 'metadata' | 'p
 export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, onAuthRequired }) => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<StudioMode>('choice');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [aiAnalysis, setAiAnalysis] = useState<ImageAnalysis | null>(null);
+  const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio>('9:16');
   const [deviceTarget, setDeviceTarget] = useState<'phone' | 'pc' | 'tab'>('phone');
@@ -36,75 +58,166 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
   const handleBack = () => {
     soundService.playTick();
     setMode('choice');
+    setUploadItems([]);
+  };
+
+  const processFile = async (file: File) => {
+    const id = Math.random().toString(36).substring(7);
+
+    // Create preview and detect dimensions with timeout and robust error handling
+    let previewData: { previewUrl: string, width: number, height: number } | null = null;
+    try {
+      previewData = await new Promise<{ previewUrl: string, width: number, height: number }>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('File processing timeout')), 10000);
+        const reader = new FileReader();
+
+        reader.onloadend = () => {
+          const url = reader.result as string;
+          const img = new Image();
+          img.onload = () => {
+            clearTimeout(timeout);
+            resolve({ previewUrl: url, width: img.naturalWidth, height: img.naturalHeight });
+          };
+          img.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('Image load failed'));
+          };
+          img.src = url;
+        };
+
+        reader.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('File read failed'));
+        };
+
+        reader.readAsDataURL(file);
+      });
+    } catch (err) {
+      console.warn(`Initial processing for ${file.name} failed:`, err);
+      // Fallback preview with zeroed dims if it completely fails
+      previewData = { previewUrl: '', width: 0, height: 0 };
+    }
+
+    const newItem: UploadItem = {
+      id,
+      file,
+      previewUrl: previewData.previewUrl,
+      status: 'analyzing',
+      title: file.name.split('.')[0].replace(/[-_]/g, ' '),
+      tags: ['Original', 'Upload'],
+      aiAnalysis: null,
+      progress: 0,
+      width: previewData.width,
+      height: previewData.height
+    };
+
+    setUploadItems(prev => [...prev, newItem]);
+
+    if (!previewData.previewUrl) {
+      setUploadItems(prev => prev.map(item => item.id === id ? { ...item, status: 'ready' } : item));
+      return;
+    }
+
+    try {
+      // AI analysis with timeout (15s)
+      const analysisPromise = aiCacheService.getImageAnalysis(previewData.previewUrl);
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('AI Analysis Timeout')), 15000)
+      );
+
+      const analysis = await Promise.race([analysisPromise, timeoutPromise]) as ImageAnalysis;
+
+      setUploadItems(prev => prev.map(item =>
+        item.id === id ? {
+          ...item,
+          status: 'ready',
+          aiAnalysis: analysis,
+          tags: analysis.tags,
+          title: analysis.title || item.title,
+          progress: 100
+        } : item
+      ));
+    } catch (err) {
+      console.warn(`AI Analysis for ${file.name} failed or timed out:`, err);
+      setUploadItems(prev => prev.map(item =>
+        item.id === id ? { ...item, status: 'ready' } : item
+      ));
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
 
     soundService.playTick();
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      setPreviewUrl(base64);
-      setMode('analyzing');
+    setMode('analyzing');
 
-      try {
-        // Use cached AI analysis (localStorage → Gemini API)
-        const analysis = await aiCacheService.getImageAnalysis(base64);
-        setAiAnalysis(analysis);
-        setTags(analysis.tags);
-        setTitle(analysis.title || file.name.split('.')[0].replace(/[-_]/g, ' '));
-        soundService.playSuccess();
-        setMode('metadata');
-      } catch (err) {
-        setTags(['Original', 'Upload']);
-        setTitle(file.name.split('.')[0].replace(/[-_]/g, ' '));
-        setMode('metadata');
-      }
-    };
-    reader.readAsDataURL(file);
+    // Process files sequentially to avoid 429 errors and resource overload
+    for (const file of files) {
+      await processFile(file);
+    }
+
+    soundService.playSuccess();
+    setMode('metadata');
   };
 
   const handleFinalize = async () => {
-    if (!previewUrl || isPublishing) return;
+    if (uploadItems.length === 0 || isPublishing) return;
     setIsPublishing(true);
     setMode('publishing');
     soundService.playSuccess();
 
-    try {
-      const cloudinaryUrl = await cloudinaryService.uploadImage(previewUrl);
-      const newWallpaper: Wallpaper = {
-        id: `aura-${Date.now()}`,
-        title: title || 'Untitled Aura',
-        author: 'You',
-        authorAvatar: 'https://i.pravatar.cc/150?u=you',
-        url: cloudinaryUrl,
-        views: '0',
-        downloads: '0',
-        likes: '0',
-        // Persist AI analysis for reuse (avoid repeat API calls)
-        aiInsight: aiAnalysis?.description || '',
-        aiDescription: aiAnalysis?.description || '',
-        aiColors: aiAnalysis?.colors || [],
-        aiMood: aiAnalysis?.mood || '',
-        aiCategory: aiAnalysis?.category || '',
-        aiObjects: aiAnalysis?.objects || [],
-        type: isLive ? 'live' : 'static',
-        tags: tags.length > 0 ? tags : ['Original'],
-        aspectRatio: selectedRatio,
-        deviceTarget: deviceTarget,
-        visibility: visibility
-      };
+    const publishPromises = uploadItems.map(async (item) => {
+      try {
+        setUploadItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'publishing' } : i));
 
-      await onUploadSuccess(newWallpaper);
-    } catch (error) {
-      console.error('Finalize error:', error);
-      alert('Failed to publish wallpaper. Please try again.');
-      setMode('metadata');
-    } finally {
-      setIsPublishing(false);
+        const cloudinaryUrl = await cloudinaryService.uploadImage(item.previewUrl);
+
+        const newWallpaper: Wallpaper = {
+          id: `aura-${Date.now()}-${item.id}`,
+          title: item.title || 'Untitled Aura',
+          author: currentUser?.name || 'You',
+          authorAvatar: currentUser?.avatar || 'https://i.pravatar.cc/150?u=you',
+          url: cloudinaryUrl,
+          views: 0,
+          downloads: 0,
+          likes: 0,
+          aiInsight: item.aiAnalysis?.description || '',
+          aiDescription: item.aiAnalysis?.description || '',
+          aiColors: item.aiAnalysis?.colors || [],
+          aiMood: item.aiAnalysis?.mood || '',
+          aiCategory: item.aiAnalysis?.category || '',
+          aiObjects: item.aiAnalysis?.objects || [],
+          type: isLive ? 'live' : 'static',
+          tags: item.tags.length > 0 ? item.tags : ['Original'],
+          aspectRatio: selectedRatio,
+          deviceTarget: deviceTarget,
+          visibility: visibility,
+          width: item.width,
+          height: item.height
+        };
+
+        await onUploadSuccess(newWallpaper);
+        setUploadItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'success', progress: 100 } : i));
+      } catch (error) {
+        console.error(`Finalize error for ${item.id}:`, error);
+        setUploadItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'error' } : i));
+      }
+    });
+
+    await Promise.all(publishPromises);
+    setIsPublishing(false);
+
+    // Check if all were successful
+    const allSuccess = uploadItems.every(item => item.status === 'success');
+    if (allSuccess) {
+      setTimeout(() => navigate('/profile'), 2000);
     }
+  };
+
+  const removeItem = (id: string) => {
+    setUploadItems(prev => prev.filter(item => item.id !== id));
+    if (uploadItems.length <= 1) setMode('choice');
   };
 
   return (
@@ -129,7 +242,7 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Creative Studio</span>
               </div>
               <h2 className="text-6xl lg:text-7xl font-black mb-4 tracking-tighter leading-none italic">Aura Studio</h2>
-              <p className="text-black/30 dark:text-white/30 font-bold text-sm label-meta tracking-widest text-center">Visual Synthesis Engine v5.0 — Gemini Vision</p>
+              <p className="text-black/30 dark:text-white/30 font-bold text-sm label-meta tracking-widest text-center">Visual Synthesis Engine v6.0 — Multi-Phase Logic</p>
             </motion.div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
@@ -137,8 +250,8 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
                 {
                   id: 'upload',
                   icon: CloudUploadIcon,
-                  title: 'Direct Upload',
-                  desc: 'AI analyzes your image instantly',
+                  title: 'Batch Upload',
+                  desc: 'Parallel AI analysis for multiple images',
                   color: 'primary',
                   action: () => fileInputRef.current?.click()
                 },
@@ -184,7 +297,7 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
                 </motion.button>
               ))}
             </div>
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleFileChange} />
           </motion.div>
         )}
 
@@ -220,45 +333,45 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex flex-col items-center justify-center h-[70vh] text-center"
+            className="flex flex-col items-center justify-center min-h-[70vh] text-center"
           >
-            <div className="relative size-48 mb-16">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                className="absolute inset-0 border-t-2 border-accent rounded-full"
-              />
-              <motion.div
-                animate={{ rotate: -360 }}
-                transition={{ repeat: Infinity, duration: 5, ease: "linear" }}
-                className="absolute inset-4 border-r-2 border-primary/40 rounded-full"
-              />
-              <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <AnimateIcon animation="path">
-                  <BrainIcon size={48} className="text-accent fill-icon" />
-                </AnimateIcon>
-              </motion.div>
-
-              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                <div className="flex gap-1 justify-center">
-                  {[...Array(5)].map((_, i) => (
+            <div className="w-full max-w-4xl px-6 mb-16">
+              <Masonry<UploadItem>
+                items={uploadItems}
+                gap={24}
+                renderItem={(item, idx) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="relative rounded-2xl overflow-hidden border border-outline/10 bg-black/5"
+                    style={{ aspectRatio: item.width && item.height ? `${item.width}/${item.height}` : '9/16' }}
+                  >
+                    <img src={item.previewUrl} className="w-full h-full object-cover opacity-40 grayscale" alt="Analyzing" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                        className="size-10 border-t-2 border-accent rounded-full mb-4"
+                      />
+                      <span className="text-[8px] font-black uppercase tracking-widest text-on-surface/60">Analyzing...</span>
+                    </div>
+                    {/* Scan Line effect */}
                     <motion.div
-                      key={i}
-                      animate={{ height: [4, 12, 4] }}
-                      transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }}
-                      className="w-1 bg-accent rounded-full"
+                      animate={{ top: ['0%', '100%', '0%'] }}
+                      transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
+                      className="absolute left-0 right-0 h-0.5 bg-accent/40 shadow-[0_0_15px_rgba(139,92,246,0.5)] z-10"
                     />
-                  ))}
-                </div>
-              </div>
+                  </motion.div>
+                )}
+              />
             </div>
 
-            <h3 className="text-3xl font-black mb-4 tracking-tighter leading-none">Gemini Vision Analysis</h3>
-            <p className="text-black/30 dark:text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">AI is analyzing your image...</p>
+            <div className="max-w-md">
+              <h3 className="text-3xl font-black mb-4 tracking-tighter leading-none italic">Gemini Parallel Synthesis</h3>
+              <p className="text-black/30 dark:text-white/30 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">Processing {uploadItems.length} auras simultaneously...</p>
+            </div>
           </motion.div>
         )}
 
@@ -269,38 +382,41 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
             animate={{ opacity: 1 }}
             className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-surface/95 backdrop-blur-3xl"
           >
-            <div className="max-w-md w-full px-10 text-center">
-              <div className="relative size-32 mx-auto mb-16">
-                <svg className="w-full h-full -rotate-90">
-                  <motion.circle
-                    cx="64" cy="64" r="60"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    className="text-black/5 dark:text-white/5"
-                  />
-                  <motion.circle
-                    cx="64" cy="64" r="60"
-                    fill="none"
-                    stroke="url(#aura-grad)"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    initial={{ strokeDasharray: "0 400" }}
-                    animate={{ strokeDasharray: "400 400" }}
-                    transition={{ duration: 4, ease: "easeInOut" }}
-                  />
-                  <defs>
-                    <linearGradient id="aura-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#8b5cf6" />
-                      <stop offset="100%" stopColor="#ec4899" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <AnimateIcon animation="default">
-                    <SparklesIcon size={40} className="text-accent" />
-                  </AnimateIcon>
-                </div>
+            <div className="max-w-4xl w-full px-10 text-center">
+              <div className="w-full mb-16">
+                <Masonry<UploadItem>
+                  items={uploadItems}
+                  gap={16}
+                  columns={{ 640: 3, 1024: 5 }}
+                  renderItem={(item, i) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="relative rounded-2xl overflow-hidden border border-outline/10"
+                      style={{ aspectRatio: item.width && item.height ? `${item.width}/${item.height}` : '4/3' }}
+                    >
+                      <img src={item.previewUrl} className="w-full h-full object-cover" />
+                      {item.status === 'publishing' && (
+                        <div className="absolute inset-0 bg-accent/20 flex items-center justify-center px-2">
+                          <motion.div
+                            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                            transition={{ repeat: Infinity, duration: 1 }}
+                            className="size-1 bg-white rounded-full shadow-[0_0_10px_white]"
+                          />
+                        </div>
+                      )}
+                      {item.status === 'success' && (
+                        <div className="absolute inset-0 bg-green-500/20 backdrop-blur-sm flex items-center justify-center">
+                          <div className="size-12 rounded-full bg-white flex items-center justify-center">
+                            <SparklesIcon className="text-green-500" size={24} />
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                />
               </div>
 
               <motion.div
@@ -309,9 +425,9 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
                 transition={{ delay: 0.2 }}
                 className="space-y-4"
               >
-                <h3 className="text-3xl font-black tracking-tight leading-none italic">Synchronizing Aura</h3>
+                <h3 className="text-3xl font-black tracking-tight leading-none italic">Aura Propagation</h3>
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-black/40 dark:text-white/40 leading-relaxed">
-                  Encrypting and propagating your creation<br />to the community grid
+                  Synchronizing {uploadItems.filter(i => i.status === 'success').length} / {uploadItems.length} entities<br />to the global neural grid
                 </p>
 
                 <div className="pt-8 flex justify-center gap-1.5">
@@ -330,9 +446,9 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
         )}
 
         {mode === 'metadata' && (
-          <motion.div key="metadata" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="max-w-xl mx-auto pb-32">
+          <motion.div key="metadata" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="max-w-4xl mx-auto pb-32 w-full">
             <div className="flex items-center justify-between mb-12">
-              <h2 className="text-3xl font-black tracking-tight">Final Details</h2>
+              <h2 className="text-3xl font-black tracking-tight italic">Studio Refinement</h2>
               <button onClick={handleBack} className="text-black/30 dark:text-white/30 hover:text-black dark:hover:text-white transition-colors">
                 <AnimateIcon animation="default">
                   <XIcon size={24} />
@@ -340,124 +456,108 @@ export const Upload: React.FC<UploadProps> = ({ onUploadSuccess, currentUser, on
               </button>
             </div>
 
-            <div className="space-y-10">
-
-              {/* AI Analysis Card */}
-              {aiAnalysis && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-6 rounded-3xl bg-gradient-to-br from-primary/10 via-accent/5 to-transparent border border-primary/20"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <SparklesIcon size={16} className="text-accent" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent">Gemini Vision Analysis</span>
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-sm text-on-surface/80 italic mb-5 leading-relaxed">"{aiAnalysis.description}"</p>
-
-                  {/* Color Palette */}
-                  <div className="mb-5">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant mb-2 block">Detected Colors</span>
-                    <div className="flex gap-2 flex-wrap">
-                      {aiAnalysis.colors.map((c, i) => (
-                        <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface/50 border border-outline/10">
-                          <div className="size-3 rounded-full ring-1 ring-black/10" style={{ backgroundColor: c.hex }} />
-                          <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant">{c.name}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              {/* Left Side: Items List */}
+              <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
+                <label className="label-meta text-black/30 dark:text-white/30 sticky top-0 bg-surface/80 backdrop-blur-md z-10 py-2">Batch Elements ({uploadItems.length})</label>
+                {uploadItems.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    layout
+                    className="p-4 rounded-3xl bg-surface border border-outline/10 flex gap-4 group hover:border-accent/40 transition-colors"
+                  >
+                    <div className="size-24 rounded-2xl overflow-hidden flex-shrink-0 border border-outline/10">
+                      <img src={item.previewUrl} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-grow flex flex-col justify-between py-1">
+                      <div>
+                        <input
+                          type="text"
+                          value={item.title}
+                          onChange={(e) => {
+                            setUploadItems(prev => prev.map(i => i.id === item.id ? { ...i, title: e.target.value } : i));
+                          }}
+                          className="w-full bg-transparent font-black text-sm tracking-tight outline-none mb-2"
+                          placeholder="Untitled Aura"
+                        />
+                        <div className="flex flex-wrap gap-1">
+                          {item.tags.slice(0, 3).map((tag, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded-full bg-black/5 dark:bg-white/5 text-[8px] font-black uppercase tracking-widest opacity-60">
+                              {tag}
+                            </span>
+                          ))}
+                          {item.tags.length > 3 && <span className="text-[8px] font-black opacity-30 mt-1">+{item.tags.length - 3}</span>}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Objects & Mood */}
-                  <div className="flex gap-4 flex-wrap">
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-accent">Mood: {aiAnalysis.mood}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-primary">Category: {aiAnalysis.category}</span>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Image Preview */}
-              {previewUrl && (
-                <div className="relative rounded-3xl overflow-hidden aspect-video border border-outline/10">
-                  <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-
-              {/* Target Format */}
-              <div className="space-y-4">
-                <label className="label-meta text-black/30 dark:text-white/30">Target Format</label>
-                <div className="grid grid-cols-4 gap-3">
-                  {(['Mobile', 'Desktop', 'Tablet', 'Square'] as const).map((label) => {
-                    const ratioMap: Record<string, AspectRatio> = { Mobile: '9:16', Desktop: '16:9', Tablet: '4:3', Square: '1:1' };
-                    const ratio = ratioMap[label];
-                    return (
+                      </div>
                       <button
-                        key={label}
-                        onClick={() => setSelectedRatio(ratio)}
-                        className={`py-4 rounded-lg border text-[9px] font-black uppercase tracking-widest transition-all ${selectedRatio === ratio
-                          ? 'bg-primary text-white border-primary'
-                          : 'bg-transparent border-black/5 dark:border-white/5 text-black/40 dark:text-white/40'
-                          }`}
+                        onClick={() => removeItem(item.id)}
+                        className="text-[8px] font-black uppercase tracking-widest text-error opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        {label}
+                        Remove Entity
                       </button>
-                    );
-                  })}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Right Side: Global Metadata & Actions */}
+              <div className="space-y-10">
+                {/* Visual Settings */}
+                <div className="p-8 rounded-[48px] bg-black/5 dark:bg-white/5 border border-outline/5 space-y-8">
+                  <div className="space-y-4">
+                    <label className="label-meta text-black/30 dark:text-white/30">Universal Projection</label>
+                    <div className="grid grid-cols-4 gap-3">
+                      {(['Mobile', 'PC', 'Tab', '1:1'] as const).map((label) => {
+                        const ratioMap: Record<string, AspectRatio> = { 'Mobile': '9:16', 'PC': '16:9', 'Tab': '4:3', '1:1': '1:1' };
+                        const ratio = ratioMap[label];
+                        return (
+                          <button
+                            key={label}
+                            onClick={() => setSelectedRatio(ratio)}
+                            className={`py-4 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${selectedRatio === ratio
+                              ? 'bg-primary text-white border-primary shadow-lg scale-105'
+                              : 'bg-transparent border-black/5 dark:border-white/5 text-black/40 dark:text-white/40 hover:border-primary/20'
+                              }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Visibility */}
+                  <div className="flex items-center justify-between pt-4 border-t border-outline/10">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-widest mb-1">Public Universe</p>
+                      <p className="text-[9px] text-black/40 dark:text-white/40 uppercase tracking-widest italic">Broadcast to community</p>
+                    </div>
+                    <button
+                      onClick={() => setVisibility(v => v === 'public' ? 'private' : 'public')}
+                      className={`size-12 rounded-2xl flex items-center justify-center transition-all ${visibility === 'public' ? 'bg-accent text-white shadow-lg' : 'bg-black/10 text-black/40'}`}
+                    >
+                      <AnimateIcon animation="default">
+                        {visibility === 'public' ? <EyeIcon size={20} /> : <EyeOffIcon size={20} />}
+                      </AnimateIcon>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <button
+                    onClick={handleFinalize}
+                    disabled={isPublishing || uploadItems.length === 0}
+                    className="w-full h-24 bg-primary text-on-primary rounded-[32px] font-black text-sm uppercase tracking-[0.4em] shadow-2 hover:shadow-4 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
+                    {isPublishing ? 'Synchronizing Universe...' : `Publish ${uploadItems.length} Auras`}
+                  </button>
+                  <div className="text-center space-y-1">
+                    <p className="text-[8px] font-black uppercase tracking-[0.3em] opacity-30 italic">Each aura will be published as an individual post</p>
+                    <p className="text-[8px] font-black uppercase tracking-[0.3em] opacity-30">All items will inherit universal projection settings</p>
+                  </div>
                 </div>
               </div>
-
-              {/* Title */}
-              <div className="space-y-4">
-                <label className="label-meta text-black/30 dark:text-white/30">Aura Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-transparent border-b border-black/10 dark:border-white/10 py-4 font-black text-xl tracking-tight outline-none focus:border-accent transition-colors"
-                />
-              </div>
-
-              {/* AI Tags */}
-              <div className="space-y-4">
-                <label className="label-meta text-black/30 dark:text-white/30">AI-Generated Tags</label>
-                <div className="flex flex-wrap gap-2">
-                  {tags.map((tag, i) => (
-                    <span key={i} className="px-4 py-2 rounded-full bg-secondary-container/30 text-[10px] font-black uppercase tracking-widest text-on-secondary-container border border-outline/10">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Visibility Toggle */}
-              <div className="bg-black/5 dark:bg-white/5 p-6 rounded-2xl flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest mb-1">Public Universe</p>
-                  <p className="text-[9px] text-black/40 dark:text-white/40 uppercase tracking-widest">Visible to everyone in the feed</p>
-                </div>
-                <button
-                  onClick={() => setVisibility(v => v === 'public' ? 'private' : 'public')}
-                  className={`size-12 rounded-xl flex items-center justify-center transition-all ${visibility === 'public' ? 'bg-accent text-white' : 'bg-black/10 text-black/40'}`}
-                >
-                  <AnimateIcon animation="default">
-                    {visibility === 'public' ? <EyeIcon size={20} /> : <EyeOffIcon size={20} />}
-                  </AnimateIcon>
-                </button>
-              </div>
-
-              <button
-                onClick={handleFinalize}
-                disabled={isPublishing}
-                className="w-full h-20 bg-primary text-on-primary rounded-full font-black text-xs uppercase tracking-[0.3em] shadow-2 hover:shadow-3 hover:scale-[1.01] active:scale-[0.99] transition-all disabled:opacity-50"
-              >
-                {isPublishing ? 'Synchronizing...' : 'Publish to Universe'}
-              </button>
             </div>
           </motion.div>
         )}
