@@ -148,7 +148,7 @@ const WallpaperCard = React.memo(({
   );
 });
 
-export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWallpapers = [], onSearchClick }) => {
+const HomeComp: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWallpapers = [], onSearchClick }) => {
   const [selectedCategory, setSelectedCategory] = useState('Curated');
   const [pexelsItems, setPexelsItems] = useState<WallpaperItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -343,3 +343,6 @@ export const Home: React.FC<HomeProps> = ({ onSelect, likedIds, onLike, customWa
     </div>
   );
 };
+
+// Optimization: Memoize Home to prevent re-renders when App state changes (e.g. search overlay, notifications)
+export const Home = React.memo(HomeComp);
