@@ -34,7 +34,7 @@ const toWallpaper = (item: WallpaperItem): Wallpaper => ({
     height: item.height
 });
 
-export const Lens: React.FC<LensProps> = ({ onSelect }) => {
+const LensComp: React.FC<LensProps> = ({ onSelect }) => {
     const navigate = useNavigate();
     const [state, setState] = useState<LensState>('capture');
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -405,3 +405,6 @@ export const Lens: React.FC<LensProps> = ({ onSelect }) => {
         </div>
     );
 };
+
+// Optimization: Memoize Lens to prevent re-renders when App state changes
+export const Lens = React.memo(LensComp);

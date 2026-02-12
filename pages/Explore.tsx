@@ -51,7 +51,7 @@ const categoryImages: Record<string, string> = {
   'Abstract': 'https://images.pexels.com/photos/2110951/pexels-photo-2110951.jpeg?auto=compress&cs=tinysrgb&w=600',
 };
 
-export const Explore: React.FC<ExploreProps> = ({ onSelect }) => {
+const ExploreComp: React.FC<ExploreProps> = ({ onSelect }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<WallpaperItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -448,3 +448,6 @@ export const Explore: React.FC<ExploreProps> = ({ onSelect }) => {
     </div>
   );
 };
+
+// Optimization: Memoize Explore to prevent re-renders when App state changes
+export const Explore = React.memo(ExploreComp);

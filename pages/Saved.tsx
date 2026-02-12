@@ -15,7 +15,7 @@ interface SavedProps {
   wallpapers: Wallpaper[];
 }
 
-export const Saved: React.FC<SavedProps> = ({ onSelect, savedIds, wallpapers }) => {
+const SavedComp: React.FC<SavedProps> = ({ onSelect, savedIds, wallpapers }) => {
   const savedItems = useMemo(() => {
     return wallpapers.filter(wp => savedIds.includes(wp.id));
   }, [savedIds, wallpapers]);
@@ -87,3 +87,6 @@ export const Saved: React.FC<SavedProps> = ({ onSelect, savedIds, wallpapers }) 
     </div>
   );
 };
+
+// Optimization: Memoize Saved to prevent re-renders when App state changes
+export const Saved = React.memo(SavedComp);
