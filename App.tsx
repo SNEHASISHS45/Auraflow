@@ -53,6 +53,16 @@ const App: React.FC = () => {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
+  const navigateToTab = useCallback((tab: AppTab) => {
+    soundService.playTap();
+    navigate(`/${tab === AppTab.HOME ? '' : tab}`);
+  }, [navigate]);
+
+  const refreshWallpapers = useCallback(async () => {
+    const items = await dbService.getAllWallpapers();
+    setWallpapers(items);
+  }, []);
+
   const handleLike = useCallback((id: string) => {
     setLikedIds(prev => {
       const next = prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id];
@@ -127,17 +137,7 @@ const App: React.FC = () => {
 
     refreshWallpapers();
     return () => unsubAuth();
-  }, []);
-
-  const navigateToTab = (tab: AppTab) => {
-    soundService.playTap();
-    navigate(`/${tab === AppTab.HOME ? '' : tab}`);
-  };
-
-  const refreshWallpapers = async () => {
-    const items = await dbService.getAllWallpapers();
-    setWallpapers(items);
-  };
+  }, [refreshWallpapers]);
 
   if (isLoading) return (
     <div className="min-h-screen bg-background-dark">
