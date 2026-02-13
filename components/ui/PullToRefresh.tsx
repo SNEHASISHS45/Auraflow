@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, animate, useMotionValue, MotionValue, useTransform } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
 import { soundService } from '../../services/soundService';
@@ -36,7 +36,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
         return () => scrollParent.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const handleRelease = async () => {
+    const handleRelease = useCallback(async () => {
         const currentY = y.get();
 
         if (currentY >= PULL_THRESHOLD) {
@@ -67,7 +67,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
             });
             setPullProgress(0);
         }
-    };
+    }, [y, onRefresh, PULL_THRESHOLD, REFRESH_Y]);
 
     useEffect(() => {
         const el = containerRef.current;
@@ -109,8 +109,12 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
         };
 
         el.addEventListener('touchstart', handleTouchStart, { passive: true });
-        el.addEventListener('touchmove', handleTouchMove, { passive: false });
         el.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+        // Only attach active listener if we can potentially drag (at top)
+        if (canDrag) {
+            el.addEventListener('touchmove', handleTouchMove, { passive: false });
+        }
 
         return () => {
             el.removeEventListener('touchstart', handleTouchStart);
