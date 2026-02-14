@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, animate, useMotionValue, MotionValue, useTransform } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
 import { soundService } from '../../services/soundService';
@@ -9,16 +9,16 @@ interface PullToRefreshProps {
     pullY?: MotionValue<number>;
 }
 
+// iPhone-like constants
+const PULL_THRESHOLD = 80;
+const REFRESH_Y = 60;
+
 export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, pullY }) => {
     const internalY = useMotionValue(0);
     const y = pullY || internalY;
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [pullProgress, setPullProgress] = useState(0);
     const [canDrag, setCanDrag] = useState(true);
-
-    // iPhone-like constants
-    const PULL_THRESHOLD = 80;
-    const REFRESH_Y = 60;
 
     const containerRef = useRef<HTMLDivElement>(null);
     const startY = useRef(0);
@@ -36,7 +36,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
         return () => scrollParent.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const handleRelease = async () => {
+    const handleRelease = useCallback(async () => {
         const currentY = y.get();
 
         if (currentY >= PULL_THRESHOLD) {
@@ -67,7 +67,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
             });
             setPullProgress(0);
         }
-    };
+    }, [y, onRefresh]);
 
     useEffect(() => {
         const el = containerRef.current;
@@ -117,7 +117,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
             el.removeEventListener('touchmove', handleTouchMove);
             el.removeEventListener('touchend', handleTouchEnd);
         };
-    }, [canDrag, isRefreshing, y, PULL_THRESHOLD, onRefresh, handleRelease]);
+    }, [canDrag, isRefreshing, y, handleRelease]);
 
     return (
         <div ref={containerRef} className="relative w-full min-h-full">
