@@ -110,6 +110,11 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  const refreshWallpapers = useCallback(async () => {
+    const items = await dbService.getAllWallpapers();
+    setWallpapers(items);
+  }, []);
+
   useEffect(() => {
     const saved = localStorage.getItem('aura_saved_ids');
     const liked = localStorage.getItem('aura_liked_ids');
@@ -127,16 +132,11 @@ const App: React.FC = () => {
 
     refreshWallpapers();
     return () => unsubAuth();
-  }, []);
+  }, [refreshWallpapers]);
 
   const navigateToTab = (tab: AppTab) => {
     soundService.playTap();
     navigate(`/${tab === AppTab.HOME ? '' : tab}`);
-  };
-
-  const refreshWallpapers = async () => {
-    const items = await dbService.getAllWallpapers();
-    setWallpapers(items);
   };
 
   if (isLoading) return (
