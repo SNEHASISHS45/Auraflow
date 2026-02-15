@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, animate, useMotionValue, MotionValue, useTransform } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
 import { soundService } from '../../services/soundService';
@@ -9,16 +9,20 @@ interface PullToRefreshProps {
     pullY?: MotionValue<number>;
 }
 
+// iPhone-like constants
+const PULL_THRESHOLD = 80;
+const REFRESH_Y = 60;
+
 export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, children, pullY }) => {
     const internalY = useMotionValue(0);
     const y = pullY || internalY;
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [pullProgress, setPullProgress] = useState(0);
     const [canDrag, setCanDrag] = useState(true);
 
-    // iPhone-like constants
-    const PULL_THRESHOLD = 80;
-    const REFRESH_Y = 60;
+    // Derived MotionValues for 60fps animations without re-renders
+    const pullProgress = useTransform(y, [0, PULL_THRESHOLD], [0, 1], { clamp: true });
+    const rotation = useTransform(pullProgress, [0, 1], [0, 540]);
+    const indicatorY = useTransform(y, [0, PULL_THRESHOLD], [-20, 30]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const startY = useRef(0);
@@ -36,7 +40,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
         return () => scrollParent.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const handleRelease = async () => {
+    const handleRelease = useCallback(async () => {
         const currentY = y.get();
 
         if (currentY >= PULL_THRESHOLD) {
@@ -57,7 +61,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
                     stiffness: 300,
                     damping: 30,
                 });
-                setPullProgress(0);
             }
         } else {
             animate(y, 0, {
@@ -65,9 +68,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
                 stiffness: 300,
                 damping: 30,
             });
-            setPullProgress(0);
         }
-    };
+    }, [y, onRefresh]);
 
     useEffect(() => {
         const el = containerRef.current;
@@ -95,7 +97,6 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
                 const resistance = 0.4;
                 const newY = diff * resistance;
                 y.set(newY);
-                setPullProgress(Math.min(1, newY / PULL_THRESHOLD));
             } else {
                 isActuallyDragging.current = false;
             }
@@ -117,14 +118,14 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
             el.removeEventListener('touchmove', handleTouchMove);
             el.removeEventListener('touchend', handleTouchEnd);
         };
-    }, [canDrag, isRefreshing, y, PULL_THRESHOLD, onRefresh, handleRelease]);
+    }, [canDrag, isRefreshing, y, onRefresh, handleRelease]);
 
     return (
         <div ref={containerRef} className="relative w-full min-h-full">
             {/* Pull Indicator */}
             <motion.div
                 style={{
-                    y: useTransform(y, [0, PULL_THRESHOLD], [-20, 30]),
+                    y: indicatorY,
                     opacity: pullProgress,
                     scale: pullProgress
                 }}
@@ -132,8 +133,9 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
             >
                 <div className="bg-surface/80 backdrop-blur-xl rounded-full p-3 border border-outline/20 shadow-lg transition-colors">
                     <motion.div
-                        animate={isRefreshing ? { rotate: 360 } : { rotate: pullProgress * 540 }}
-                        transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : { type: 'spring', damping: 15 }}
+                        style={{ rotate: rotation }}
+                        animate={isRefreshing ? { rotate: 360 } : undefined}
+                        transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : undefined}
                     >
                         <RefreshCw size={24} className={isRefreshing ? 'text-primary' : 'text-primary/60'} />
                     </motion.div>
